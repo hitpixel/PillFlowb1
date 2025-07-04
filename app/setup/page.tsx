@@ -92,7 +92,7 @@ export default function SetupPage() {
       await updateUserProfile({
         phoneNumber: formData.get("phoneNumber") as string,
         aphraRegistrationNumber: formData.get("aphraRegistrationNumber") as string,
-        healthcareProfessionalType: formData.get("healthcareProfessionalType") as any,
+        healthcareProfessionalType: formData.get("healthcareProfessionalType") as "pharmacist" | "general_practitioner" | "nurse" | "administration" | "aged_care_worker" | "specialist" | "other",
       });
       setCurrentStep("choice");
     } catch (error: unknown) {

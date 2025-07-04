@@ -12,7 +12,6 @@ import {
   Phone, 
   MapPin, 
   Globe,
-  Copy,
   Shield,
   Crown,
   Eye,
@@ -153,11 +152,7 @@ export default function OrganizationOverviewPage() {
     );
   }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setSuccess("Copied to clipboard!");
-    setTimeout(() => setSuccess(null), 2000);
-  };
+
 
   const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
