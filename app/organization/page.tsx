@@ -113,7 +113,7 @@ export default function OrganizationOverviewPage() {
   
   // Mutations
   const createInvitation = useMutation(api.users.createMemberInvitation);
-  const inviteUser = useMutation(api.users.inviteUserToOrganization);
+  const sendDirectInvitationEmail = useMutation(api.emails.sendInvitationEmailDirect);
   const sendTestEmail = useMutation(api.emails.sendTestEmail);
   const sendTestInvitationEmail = useMutation(api.emails.sendTestInvitationEmail);
   const debugEmailSystem = useMutation(api.emails.debugEmailSystem);
@@ -199,23 +199,97 @@ export default function OrganizationOverviewPage() {
       setInviteError("Please create an invitation first");
       return;
     }
+
+    if (!organization || !userProfile) {
+      setInviteError("Organization or user profile not found");
+      return;
+    }
     
     setIsEmailSending(true);
     setInviteError(null);
     
     try {
-      await inviteUser({
-        email: createdInvite.email,
+      console.log("🚀 Sending direct invitation email...");
+      const result = await sendDirectInvitationEmail({
+        inviteEmail: createdInvite.email,
+        organizationName: organization.name,
+        inviterName: `${userProfile.firstName} ${userProfile.lastName}`,
+        inviteToken: createdInvite.token,
+      });
+      
+      if (result.success) {
+        setSuccess(`✅ Email sent successfully to ${createdInvite.email}! Email ID: ${result.emailId}`);
+        console.log("✅ Direct email sent successfully:", result);
+      } else {
+        setInviteError(`❌ Failed to send email: ${result.error}`);
+        console.error("❌ Direct email failed:", result);
+      }
+      
+      setTimeout(() => setSuccess(null), 7000);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send email";
+      setInviteError(`❌ Email sending failed: ${errorMessage}`);
+      console.error("❌ Direct email error:", error);
+    } finally {
+      setIsEmailSending(false);
+    }
+  };
+
+  const handleQuickSendEmail = async () => {
+    if (!inviteEmail.trim()) {
+      setInviteError("Please enter an email address");
+      return;
+    }
+
+    if (!organization || !userProfile) {
+      setInviteError("Organization or user profile not found");
+      return;
+    }
+    
+    setIsInviting(true);
+    setInviteError(null);
+    
+    try {
+      console.log("🚀 Quick send: Creating invitation and sending email...");
+      
+      // First create the invitation
+      const inviteResult = await createInvitation({
+        email: inviteEmail.trim(),
         role: inviteRole,
       });
       
-      setSuccess(`Email sent to ${createdInvite.email}!`);
-      setTimeout(() => setSuccess(null), 5000);
+      // Then send the email directly
+      const emailResult = await sendDirectInvitationEmail({
+        inviteEmail: inviteEmail.trim(),
+        organizationName: organization.name,
+        inviterName: `${userProfile.firstName} ${userProfile.lastName}`,
+        inviteToken: inviteResult.inviteToken,
+      });
+      
+      if (emailResult.success) {
+        setSuccess(`✅ Invitation created and email sent to ${inviteEmail}! Email ID: ${emailResult.emailId}`);
+        setInviteEmail("");
+        setInviteRole("member");
+        console.log("✅ Quick send successful:", emailResult);
+      } else {
+        // Even if email fails, we still created the invitation
+        setCreatedInvite({
+          token: inviteResult.inviteToken,
+          email: inviteEmail.trim(),
+        });
+        setInviteError(`⚠️ Invitation created but email failed: ${emailResult.error}`);
+        setInviteEmail("");
+        setInviteRole("member");
+        console.error("❌ Quick send email failed:", emailResult);
+      }
+      
+      setTimeout(() => setSuccess(null), 7000);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to send email";
-      setInviteError(errorMessage);
+      const errorMessage = error instanceof Error ? error.message : "Failed to create invitation or send email";
+      setInviteError(`❌ Quick send failed: ${errorMessage}`);
+      console.error("❌ Quick send error:", error);
     } finally {
-      setIsEmailSending(false);
+      setIsInviting(false);
     }
   };
 
@@ -567,7 +641,7 @@ export default function OrganizationOverviewPage() {
                     </div>
                   )}
                   
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button type="submit" disabled={isInviting} className="flex-1 md:flex-none">
                       {isInviting ? (
                         <>
@@ -581,6 +655,26 @@ export default function OrganizationOverviewPage() {
                         </>
                       )}
                     </Button>
+                    
+                    <Button 
+                      type="button" 
+                      disabled={isInviting}
+                      onClick={handleQuickSendEmail}
+                      className="flex-1 md:flex-none bg-green-600 hover:bg-green-700"
+                    >
+                      {isInviting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Mail className="w-4 h-4 mr-2" />
+                          Quick Send Email
+                        </>
+                      )}
+                    </Button>
+                    
                     <Button 
                       type="button" 
                       variant="outline" 
@@ -663,7 +757,7 @@ export default function OrganizationOverviewPage() {
                           )}
                         </Button>
                         <p className="text-xs text-gray-600 mt-1">
-                          Send the invitation directly to the user&apos;s email address.
+                          Send the invitation directly to the user&apos;s email address using our improved email system.
                         </p>
                       </div>
                     </div>
@@ -676,7 +770,14 @@ export default function OrganizationOverviewPage() {
                 
                 <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
                   <p className="text-sm text-blue-800">
-                    <strong>Note:</strong> Create an invitation first, then choose to either copy the token manually or send it via email. 
+                    <strong>Three ways to invite users:</strong>
+                  </p>
+                  <ul className="text-sm text-blue-700 mt-2 space-y-1">
+                    <li><strong>• Quick Send Email:</strong> Creates invitation and sends email immediately</li>
+                    <li><strong>• Create Invitation:</strong> Generate token first, then choose copy or email</li>
+                    <li><strong>• Manual sharing:</strong> Copy token and share via SMS, phone, or in-person</li>
+                  </ul>
+                  <p className="text-sm text-blue-700 mt-2">
                     The user can create a new account using the invitation token if they don&apos;t have one.
                   </p>
                 </div>

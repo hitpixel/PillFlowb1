@@ -366,4 +366,186 @@ If you received this email, the basic email system is working!`
       };
     }
   },
+});
+
+// Direct invitation email sending function - can be called manually
+export const sendInvitationEmailDirect = mutation({
+  args: {
+    inviteEmail: v.string(),
+    organizationName: v.string(),
+    inviterName: v.string(),
+    inviteToken: v.string(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      console.log("📧 DIRECT: Sending invitation email to:", args.inviteEmail);
+      console.log("🏢 Organization:", args.organizationName);
+      console.log("👤 Inviter:", args.inviterName);
+      console.log("🎫 Token:", args.inviteToken);
+      
+      const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+      const joinUrl = `${siteUrl}/signin?invite=${args.inviteToken}`;
+      
+      console.log("🔗 Join URL:", joinUrl);
+      console.log("📤 Sending via Resend...");
+      
+      // Generate HTML content using template function
+      const htmlContent = generateOrganizationInviteEmailHTML({
+        organizationName: args.organizationName,
+        inviterName: args.inviterName,
+        inviteToken: args.inviteToken,
+        joinUrl
+      });
+      
+      const emailId = await resend.sendEmail(
+        ctx,
+        "PillFlow Invitation <invitations@pillflow.com.au>",
+        args.inviteEmail,
+        `🎉 You've been invited to join ${args.organizationName} on PillFlow`,
+        htmlContent,
+        `You've been invited to join ${args.organizationName}
+
+${args.inviterName} has invited you to join their organization on PillFlow.
+
+PillFlow is a healthcare medication management platform designed for medical professionals.
+
+GETTING STARTED:
+- If you already have an account: Sign in and you'll automatically join the organization
+- If you're new to PillFlow: Create your account and you'll be added to the organization immediately
+
+Your invitation token: ${args.inviteToken}
+
+Accept your invitation by visiting: ${joinUrl}
+
+⏰ Important: This invitation will expire in 7 days. Please accept it soon to join the team!
+
+Best regards,
+The PillFlow Team`
+      );
+      
+      console.log("✅ DIRECT: Invitation email sent successfully! Email ID:", emailId);
+      
+      return {
+        success: true,
+        emailId,
+        details: {
+          email: args.inviteEmail,
+          organization: args.organizationName,
+          inviter: args.inviterName,
+          token: args.inviteToken,
+          joinUrl,
+          timestamp: new Date().toISOString()
+        }
+      };
+    } catch (error) {
+      console.error("❌ DIRECT: Failed to send invitation email:");
+      console.error("📧 Email:", args.inviteEmail);
+      console.error("🏢 Organization:", args.organizationName);
+      console.error("🎫 Token:", args.inviteToken);
+      console.error("💥 Error details:", error);
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+        details: {
+          email: args.inviteEmail,
+          organization: args.organizationName,
+          inviter: args.inviterName,
+          token: args.inviteToken,
+          timestamp: new Date().toISOString()
+        }
+      };
+    }
+  },
+});
+
+// Batch send invitation emails (for when multiple invites need to be sent)
+export const sendBatchInvitationEmails = mutation({
+  args: {
+    invitations: v.array(v.object({
+      inviteEmail: v.string(),
+      organizationName: v.string(),
+      inviterName: v.string(),
+      inviteToken: v.string(),
+    })),
+  },
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    totalSent: number;
+    totalFailed: number;
+    results: Array<{
+      email: string;
+      success: boolean;
+      emailId?: string;
+      error?: string;
+    }>;
+  }> => {
+    console.log("📧 BATCH: Sending", args.invitations.length, "invitation emails");
+    
+    const results: Array<{
+      email: string;
+      success: boolean;
+      emailId?: string;
+      error?: string;
+    }> = [];
+    
+    for (const invitation of args.invitations) {
+      try {
+        // Call the function logic directly to avoid circular reference
+        const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+        const joinUrl = `${siteUrl}/signin?invite=${invitation.inviteToken}`;
+        
+        const htmlContent = generateOrganizationInviteEmailHTML({
+          organizationName: invitation.organizationName,
+          inviterName: invitation.inviterName,
+          inviteToken: invitation.inviteToken,
+          joinUrl
+        });
+        
+        const emailId = await resend.sendEmail(
+          ctx,
+          "PillFlow Invitation <invitations@pillflow.com.au>",
+          invitation.inviteEmail,
+          `🎉 You've been invited to join ${invitation.organizationName} on PillFlow`,
+          htmlContent,
+          `You've been invited to join ${invitation.organizationName}
+
+${invitation.inviterName} has invited you to join their organization on PillFlow.
+
+Your invitation token: ${invitation.inviteToken}
+Accept your invitation: ${joinUrl}
+
+Best regards,
+The PillFlow Team`
+        );
+        
+        results.push({
+          email: invitation.inviteEmail,
+          success: true,
+          emailId
+        });
+        
+        // Small delay between emails to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (error) {
+        results.push({
+          email: invitation.inviteEmail,
+          success: false,
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    }
+    
+    const successCount: number = results.filter(r => r.success).length;
+    const failCount: number = results.filter(r => !r.success).length;
+    
+    console.log(`✅ BATCH: Completed - ${successCount} successful, ${failCount} failed`);
+    
+    return {
+      success: failCount === 0,
+      totalSent: successCount,
+      totalFailed: failCount,
+      results
+    };
+  },
 }); 
