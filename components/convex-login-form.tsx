@@ -108,18 +108,13 @@ export function ConvexLoginForm({
             firstName: formData.get("name") as string,
             lastName: formData.get("lastName") as string,
             email: formData.get("email") as string,
+            inviteToken: inviteToken || undefined,
           });
           
-          // If there's an invitation token, try to accept it
+          // If there was an invitation token, user is now part of organization - go to dashboard
           if (inviteToken) {
-            try {
-              await acceptInvitation({ inviteToken });
-              router.push("/dashboard"); // Go to dashboard if invitation accepted
-              return;
-            } catch (inviteError) {
-              console.error("Failed to accept invitation:", inviteError);
-              // Fall through to normal setup flow
-            }
+            router.push("/dashboard");
+            return;
           }
         } catch (profileError) {
           // Log profile creation error but don't block the redirect

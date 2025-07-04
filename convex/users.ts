@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { auth } from "./auth";
 import { internal } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
 
 // Create user profile after signup
 export const createUserProfile = mutation({
@@ -9,6 +10,7 @@ export const createUserProfile = mutation({
     firstName: v.string(),
     lastName: v.string(),
     email: v.string(),
+    inviteToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await auth.getUserId(ctx);
@@ -26,17 +28,59 @@ export const createUserProfile = mutation({
       return existingProfile._id;
     }
 
+    // Check if there's a valid invitation token
+    let organizationId: Id<"organizations"> | undefined = undefined;
+    let userRole: "admin" | "member" | "viewer" | undefined = undefined;
+    
+    if (args.inviteToken) {
+      const invitation = await ctx.db
+        .query("memberInvitations")
+        .withIndex("by_invite_token", q => q.eq("inviteToken", args.inviteToken!))
+        .first();
+
+      if (invitation && 
+          !invitation.isUsed && 
+          invitation.expiresAt > Date.now() && 
+          invitation.email === args.email) {
+        
+        organizationId = invitation.organizationId;
+        userRole = invitation.role;
+        
+        // Mark invitation as used
+        await ctx.db.patch(invitation._id, {
+          isUsed: true,
+          usedAt: Date.now(),
+        });
+      }
+    }
+
     // Create new profile
     const profileId = await ctx.db.insert("userProfiles", {
       userId,
       firstName: args.firstName,
       lastName: args.lastName,
       email: args.email,
+      organizationId,
+      role: userRole,
       profileCompleted: false,
-      setupCompleted: false,
+      setupCompleted: organizationId ? true : false, // If joining via invitation, skip setup
       createdAt: Date.now(),
       isActive: true,
     });
+
+    if (organizationId) {
+      // Update invitation with user who used it
+      const invitation = await ctx.db
+        .query("memberInvitations")
+        .withIndex("by_invite_token", q => q.eq("inviteToken", args.inviteToken!))
+        .first();
+      
+      if (invitation) {
+        await ctx.db.patch(invitation._id, {
+          usedBy: profileId,
+        });
+      }
+    }
 
     return profileId;
   },
