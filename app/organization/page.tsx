@@ -111,6 +111,7 @@ export default function OrganizationOverviewPage() {
   // Mutations
   const inviteUser = useMutation(api.users.inviteUserToOrganization);
   const sendTestEmail = useMutation(api.emails.sendTestEmail);
+  const sendTestInvitationEmail = useMutation(api.emails.sendTestInvitationEmail);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -205,6 +206,34 @@ export default function OrganizationOverviewPage() {
       setTimeout(() => setSuccess(null), 5000);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to send test email";
+      setInviteError(errorMessage);
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const handleTestInvitationEmail = async () => {
+    if (!inviteEmail.trim()) {
+      setInviteError("Please enter an email address to test");
+      return;
+    }
+    
+    setIsInviting(true);
+    setInviteError(null);
+    
+    try {
+      const result = await sendTestInvitationEmail({
+        testEmail: inviteEmail.trim(),
+      });
+      
+      if (result.success) {
+        setSuccess(`Test invitation email sent to ${inviteEmail}! Check your inbox.`);
+      } else {
+        setInviteError(`Test invitation email failed: ${result.error}`);
+      }
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send test invitation email";
       setInviteError(errorMessage);
     } finally {
       setIsInviting(false);
@@ -491,6 +520,15 @@ export default function OrganizationOverviewPage() {
                       className="px-4"
                     >
                       Test Email
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      disabled={isInviting}
+                      onClick={handleTestInvitationEmail}
+                      className="px-4"
+                    >
+                      Test Invite
                     </Button>
                   </div>
                 </form>

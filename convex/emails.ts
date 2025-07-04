@@ -241,3 +241,76 @@ The PillFlow Team`
     }
   },
 }); 
+
+// Test invitation email sending function
+export const sendTestInvitationEmail = mutation({
+  args: {
+    testEmail: v.string(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      console.log("Sending test invitation email to:", args.testEmail);
+      
+      const testToken = "TEST-1234-5678-9012";
+      const joinUrl = `${process.env.SITE_URL || 'http://localhost:3000'}/signin?invite=${testToken}`;
+      
+      const emailId = await resend.sendEmail(
+        ctx,
+        "PillFlow <noreply@pillflow.com.au>",
+        args.testEmail,
+        "Test Invitation to PillFlow",
+        `
+          <h1>Test Invitation Email ✅</h1>
+          <p>This is a test invitation email to verify that the invitation system is working correctly.</p>
+          <p>In a real invitation, you would be joining an organization on PillFlow.</p>
+          
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #334155;">How it works:</h3>
+            <p style="margin-bottom: 10px;"><strong>If you already have an account:</strong> Sign in and you'll automatically join the organization.</p>
+            <p style="margin-bottom: 0;"><strong>If you're new to PillFlow:</strong> Create your account and you'll be added to the organization immediately.</p>
+          </div>
+          
+          <p style="text-align: center; margin: 30px 0;">
+            <a href="${joinUrl}" style="background-color: #0066cc; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;">
+              Test Invitation Link (Non-functional)
+            </a>
+          </p>
+          
+          <p><strong>Test URL:</strong></p>
+          <p style="background-color: #f1f5f9; padding: 10px; border-radius: 4px; font-family: monospace; word-break: break-all;">
+            <a href="${joinUrl}">${joinUrl}</a>
+          </p>
+          
+          <p><strong>✅ If you received this email, the invitation system is working correctly!</strong></p>
+          
+          <p>Time sent: ${new Date().toISOString()}</p>
+          <p>Best regards,<br>The PillFlow Team</p>
+        `,
+        `Test Invitation Email
+
+This is a test invitation email to verify that the invitation system is working correctly.
+
+In a real invitation, you would be joining an organization on PillFlow.
+
+HOW IT WORKS:
+- If you already have an account: Sign in and you'll automatically join the organization
+- If you're new to PillFlow: Create your account and you'll be added to the organization immediately
+
+Test invitation link: ${joinUrl}
+
+✅ If you received this email, the invitation system is working correctly!
+
+Time sent: ${new Date().toISOString()}
+
+Best regards,
+The PillFlow Team`
+      );
+      
+      console.log("Test invitation email sent successfully:", emailId);
+      return { success: true, emailId };
+    } catch (error) {
+      console.error("Failed to send test invitation email:", error);
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  },
+}); 
