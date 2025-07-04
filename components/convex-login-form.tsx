@@ -19,7 +19,6 @@ export function ConvexLoginForm({
   className,
 }: ConvexLoginFormProps) {
   const { signIn } = useAuthActions();
-  const createUserProfile = useMutation(api.users.createUserProfile);
   const router = useRouter();
   
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
