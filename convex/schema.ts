@@ -34,6 +34,7 @@ export default defineSchema({
     )),
     profileCompleted: v.boolean(),
     setupCompleted: v.boolean(),
+    welcomeEmailSent: v.optional(v.boolean()),
     createdAt: v.float64(),
     isActive: v.boolean(),
   })

@@ -38,17 +38,6 @@ export const createUserProfile = mutation({
       isActive: true,
     });
 
-    // Send welcome email to the new user (don't let email failure block user creation)
-    try {
-      await ctx.scheduler.runAfter(0, internal.emails.sendWelcomeEmail, {
-        userEmail: args.email,
-        userName: args.firstName,
-      });
-    } catch (error) {
-      // Log email error but don't fail user creation
-      console.error("Failed to schedule welcome email:", error);
-    }
-
     return profileId;
   },
 });
@@ -134,6 +123,51 @@ export const getSetupStatus = query({
       needsProfileCompletion: !profile.profileCompleted,
       hasOrganization: !!profile.organizationId,
     };
+  },
+});
+
+// Send welcome email on first dashboard visit
+export const sendWelcomeEmailOnDashboard = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      throw new Error("User must be authenticated");
+    }
+
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .first();
+
+    if (!profile) {
+      throw new Error("User profile not found");
+    }
+
+    // Only send welcome email if user hasn't received it yet
+    if (!profile.welcomeEmailSent) {
+      try {
+        console.log("Sending welcome email to user on dashboard visit:", profile.email);
+        await ctx.scheduler.runAfter(0, internal.emails.sendWelcomeEmail, {
+          userEmail: profile.email,
+          userName: profile.firstName,
+        });
+        
+        // Mark that welcome email has been sent
+        await ctx.db.patch(profile._id, {
+          welcomeEmailSent: true,
+        });
+        
+        console.log("Welcome email scheduled and profile updated");
+        return { success: true };
+      } catch (error) {
+        console.error("Failed to schedule welcome email on dashboard:", error);
+        // Don't throw - we don't want email failures to break dashboard loading
+        return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+      }
+    }
+
+    return { success: true, alreadySent: true };
   },
 });
 
