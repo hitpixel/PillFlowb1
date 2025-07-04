@@ -120,8 +120,5 @@ export default defineSchema({
     .index("by_partner", ["partnerOrgId"])
     .index("by_status", ["status"]),
 
-  // Keep the numbers table for token generation
-  numbers: defineTable({
-    value: v.float64(),
-  }),
+
 });
