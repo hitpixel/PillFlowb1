@@ -120,5 +120,39 @@ export default defineSchema({
     .index("by_partner", ["partnerOrgId"])
     .index("by_status", ["status"]),
 
+  // Patients with detailed information and unique tokens for data sharing
+  patients: defineTable({
+    // Unique token for data sharing between organizations
+    shareToken: v.string(),
+    // Organization this patient belongs to
+    organizationId: v.id("organizations"),
+    // Patient personal information
+    firstName: v.string(),
+    lastName: v.string(),
+    dateOfBirth: v.string(), // YYYY-MM-DD format
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    // Address information
+    streetAddress: v.string(),
+    suburb: v.string(),
+    state: v.string(),
+    postcode: v.string(),
+    // Medication packaging preference
+    preferredPack: v.union(
+      v.literal("blister"),
+      v.literal("sachets")
+    ),
+    // Metadata
+    createdBy: v.id("userProfiles"),
+    createdAt: v.float64(),
+    updatedAt: v.float64(),
+    isActive: v.boolean(),
+  })
+    .index("by_organization", ["organizationId"])
+    .index("by_share_token", ["shareToken"])
+    .index("by_email", ["email"])
+    .index("by_name", ["lastName", "firstName"])
+    .index("by_created_by", ["createdBy"]),
+
 
 });

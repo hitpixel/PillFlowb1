@@ -1,0 +1,363 @@
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
+
+// Generate unique share token for patient data sharing
+function generateShareToken(): string {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 12; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return `PAT-${result.substring(0, 4)}-${result.substring(4, 8)}-${result.substring(8, 12)}`;
+}
+
+// Create a new patient
+export const createPatient = mutation({
+  args: {
+    firstName: v.string(),
+    lastName: v.string(),
+    dateOfBirth: v.string(),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    streetAddress: v.string(),
+    suburb: v.string(),
+    state: v.string(),
+    postcode: v.string(),
+    preferredPack: v.union(v.literal("blister"), v.literal("sachets")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization to create patients");
+    }
+
+    // Generate unique share token
+    let shareToken = generateShareToken();
+    
+    // Ensure token is unique
+    while (await ctx.db.query("patients").withIndex("by_share_token", (q) => q.eq("shareToken", shareToken)).first()) {
+      shareToken = generateShareToken();
+    }
+
+    const now = Date.now();
+    
+    const patientId = await ctx.db.insert("patients", {
+      shareToken,
+      organizationId: userProfile.organizationId,
+      firstName: args.firstName,
+      lastName: args.lastName,
+      dateOfBirth: args.dateOfBirth,
+      email: args.email,
+      phone: args.phone,
+      streetAddress: args.streetAddress,
+      suburb: args.suburb,
+      state: args.state,
+      postcode: args.postcode,
+      preferredPack: args.preferredPack,
+      createdBy: userProfile._id,
+      createdAt: now,
+      updatedAt: now,
+      isActive: true,
+    });
+
+    return patientId;
+  },
+});
+
+// Get all patients for the current user's organization
+export const getPatients = query({
+  args: {
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization to view patients");
+    }
+
+    const query = ctx.db
+      .query("patients")
+      .withIndex("by_organization", (q) => q.eq("organizationId", userProfile.organizationId!))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .order("desc");
+
+    if (args.limit) {
+      return await query.take(args.limit);
+    }
+    
+    return await query.collect();
+  },
+});
+
+// Get a specific patient by ID
+export const getPatient = query({
+  args: { id: v.id("patients") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization to view patients");
+    }
+
+    const patient = await ctx.db.get(args.id);
+    
+    if (!patient) {
+      throw new Error("Patient not found");
+    }
+
+    // Ensure patient belongs to user's organization
+    if (patient.organizationId !== userProfile.organizationId) {
+      throw new Error("Access denied: Patient belongs to different organization");
+    }
+
+    return patient;
+  },
+});
+
+// Update a patient
+export const updatePatient = mutation({
+  args: {
+    id: v.id("patients"),
+    firstName: v.optional(v.string()),
+    lastName: v.optional(v.string()),
+    dateOfBirth: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    streetAddress: v.optional(v.string()),
+    suburb: v.optional(v.string()),
+    state: v.optional(v.string()),
+    postcode: v.optional(v.string()),
+    preferredPack: v.optional(v.union(v.literal("blister"), v.literal("sachets"))),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization to update patients");
+    }
+
+    const patient = await ctx.db.get(args.id);
+    
+    if (!patient) {
+      throw new Error("Patient not found");
+    }
+
+    // Ensure patient belongs to user's organization
+    if (patient.organizationId !== userProfile.organizationId) {
+      throw new Error("Access denied: Patient belongs to different organization");
+    }
+
+    const { id, ...updateData } = args;
+    const now = Date.now();
+
+    // Only update fields that are provided
+    const fieldsToUpdate = Object.entries(updateData).reduce((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = value;
+      }
+      return acc;
+    }, {} as any);
+
+    await ctx.db.patch(args.id, {
+      ...fieldsToUpdate,
+      updatedAt: now,
+    });
+
+    return args.id;
+  },
+});
+
+// Soft delete a patient
+export const deletePatient = mutation({
+  args: { id: v.id("patients") },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization to delete patients");
+    }
+
+    const patient = await ctx.db.get(args.id);
+    
+    if (!patient) {
+      throw new Error("Patient not found");
+    }
+
+    // Ensure patient belongs to user's organization
+    if (patient.organizationId !== userProfile.organizationId) {
+      throw new Error("Access denied: Patient belongs to different organization");
+    }
+
+    await ctx.db.patch(args.id, {
+      isActive: false,
+      updatedAt: Date.now(),
+    });
+
+    return args.id;
+  },
+});
+
+// Search patients by name or email
+export const searchPatients = query({
+  args: {
+    searchTerm: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization to search patients");
+    }
+
+    const searchTerm = args.searchTerm.toLowerCase();
+    const limit = args.limit || 50;
+
+    const allPatients = await ctx.db
+      .query("patients")
+      .withIndex("by_organization", (q) => q.eq("organizationId", userProfile.organizationId!))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    // Filter by search term
+    const filteredPatients = allPatients.filter((patient) => {
+      const fullName = `${patient.firstName} ${patient.lastName}`.toLowerCase();
+      const email = patient.email?.toLowerCase() || '';
+      const shareToken = patient.shareToken.toLowerCase();
+      
+      return fullName.includes(searchTerm) || 
+             email.includes(searchTerm) || 
+             shareToken.includes(searchTerm);
+    });
+
+    return filteredPatients.slice(0, limit);
+  },
+});
+
+// Get patient by share token (for data sharing between organizations)
+export const getPatientByShareToken = query({
+  args: { shareToken: v.string() },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    const patient = await ctx.db
+      .query("patients")
+      .withIndex("by_share_token", (q) => q.eq("shareToken", args.shareToken))
+      .first();
+
+    if (!patient || !patient.isActive) {
+      throw new Error("Patient not found or inactive");
+    }
+
+    return patient;
+  },
+});
+
+// Get patient statistics for dashboard
+export const getPatientStats = query({
+  args: {},
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization to view statistics");
+    }
+
+    const allPatients = await ctx.db
+      .query("patients")
+      .withIndex("by_organization", (q) => q.eq("organizationId", userProfile.organizationId!))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    const totalPatients = allPatients.length;
+    const blisterPreference = allPatients.filter(p => p.preferredPack === "blister").length;
+    const sachetsPreference = allPatients.filter(p => p.preferredPack === "sachets").length;
+    
+    // Patients added this month
+    const thisMonth = new Date();
+    thisMonth.setDate(1);
+    thisMonth.setHours(0, 0, 0, 0);
+    const thisMonthTimestamp = thisMonth.getTime();
+    
+    const patientsThisMonth = allPatients.filter(p => p.createdAt >= thisMonthTimestamp).length;
+
+    return {
+      totalPatients,
+      patientsThisMonth,
+      packingPreferences: {
+        blister: blisterPreference,
+        sachets: sachetsPreference,
+      },
+    };
+  },
+}); 

@@ -3,9 +3,17 @@ import { Resend, vEmailId, vEmailEvent } from "@convex-dev/resend";
 import { internalMutation, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
+// Import email template generators
+import { 
+  generateWelcomeEmailHTML,
+  generateOrganizationInviteEmailHTML,
+  generatePasswordResetEmailHTML,
+  generateTestEmailHTML,
+  generateTestInvitationEmailHTML
+} from "./emailTemplates";
+
 export const resend: Resend = new Resend(components.resend, {
   testMode: false, // Production mode - emails will be sent to real addresses
-  // onEmailEvent will be added after first deployment
 });
 
 // Handle email status events from webhook
@@ -17,7 +25,6 @@ export const handleEmailEvent = internalMutation({
   handler: async (ctx, args) => {
     console.log("Email event received:", args.id, args.event);
     // You can add custom logic here to track email deliverability
-    // For example, update user records, retry failed emails, etc.
   },
 });
 
@@ -31,23 +38,15 @@ export const sendWelcomeEmail = internalMutation({
     try {
       console.log("Sending welcome email to:", args.userEmail);
       
+      // Generate HTML content using template function
+      const htmlContent = generateWelcomeEmailHTML(args.userName);
+      
       const emailId = await resend.sendEmail(
         ctx,
         "PillFlow Onboarding <onboarding@pillflow.com.au>",
         args.userEmail,
         "Welcome to PillFlow!",
-        `
-          <h1>Welcome to PillFlow, ${args.userName}!</h1>
-          <p>Thank you for joining our healthcare medication management platform.</p>
-          <p>Get started by:</p>
-          <ul>
-            <li>Completing your professional profile</li>
-            <li>Setting up your organization</li>
-            <li>Inviting team members</li>
-          </ul>
-          <p>If you have any questions, feel free to reach out to our support team.</p>
-          <p>Best regards,<br>The PillFlow Team</p>
-        `,
+        htmlContent,
         `Welcome to PillFlow, ${args.userName}!
         
 Thank you for joining our healthcare medication management platform.
@@ -67,7 +66,6 @@ The PillFlow Team`
       return emailId;
     } catch (error) {
       console.error("Failed to send welcome email:", error);
-      // Don't throw - we don't want email failures to break user creation
       return null;
     }
   },
@@ -97,41 +95,20 @@ export const sendOrganizationInvite = internalMutation({
       
       console.log("📤 Attempting to send email via Resend...");
       
+      // Generate HTML content using template function
+      const htmlContent = generateOrganizationInviteEmailHTML({
+        organizationName: args.organizationName,
+        inviterName: args.inviterName,
+        inviteToken: args.inviteToken,
+        joinUrl
+      });
+      
       const emailId = await resend.sendEmail(
         ctx,
         "PillFlow <noreply@pillflow.com.au>",
         args.inviteEmail,
         `You've been invited to join ${args.organizationName} on PillFlow`,
-        `
-          <h1>You've been invited to join ${args.organizationName}</h1>
-          <p>${args.inviterName} has invited you to join their organization on PillFlow.</p>
-          <p>PillFlow is a healthcare medication management platform designed for medical professionals.</p>
-          
-          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #334155;">Getting Started:</h3>
-            <p style="margin-bottom: 10px;"><strong>If you already have an account:</strong> Sign in and you'll automatically join the organization.</p>
-            <p style="margin-bottom: 0;"><strong>If you're new to PillFlow:</strong> Create your account and you'll be added to the organization immediately.</p>
-          </div>
-          
-          <p style="text-align: center; margin: 30px 0;">
-            <a href="${joinUrl}" style="background-color: #0066cc; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;">
-              Accept Invitation & Join ${args.organizationName}
-            </a>
-          </p>
-          
-          <p><strong>Your invitation token:</strong> <code style="background-color: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${args.inviteToken}</code></p>
-          
-          <p><strong>Or copy and paste this link into your browser:</strong></p>
-          <p style="background-color: #f1f5f9; padding: 10px; border-radius: 4px; font-family: monospace; word-break: break-all;">
-            <a href="${joinUrl}">${joinUrl}</a>
-          </p>
-          
-          <div style="background-color: #fef3cd; border: 1px solid #fbbf24; border-radius: 6px; padding: 15px; margin: 20px 0;">
-            <p style="margin: 0; color: #92400e;"><strong>⏰ Important:</strong> This invitation will expire in 7 days. Please accept it soon to join the team!</p>
-          </div>
-          
-          <p>Best regards,<br>The PillFlow Team</p>
-        `,
+        htmlContent,
         `You've been invited to join ${args.organizationName}
 
 ${args.inviterName} has invited you to join their organization on PillFlow.
@@ -167,7 +144,6 @@ The PillFlow Team`
         console.error("📚 Error stack:", error.stack);
       }
       
-      // Don't throw - we don't want email failures to break invitation creation
       return null;
     }
   },
@@ -180,27 +156,19 @@ export const sendPasswordResetEmail = mutation({
     resetToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const resetUrl = `${process.env.SITE_URL || 'http://localhost:3000'}/reset-password?token=${args.resetToken}`;
-    
-    const emailId = await resend.sendEmail(
-      ctx,
-      "PillFlow <noreply@pillflow.com.au>",
-      args.userEmail,
-      "Reset your PillFlow password",
-      `
-        <h1>Reset your password</h1>
-        <p>You requested a password reset for your PillFlow account.</p>
-        <p>
-          <a href="${resetUrl}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-            Reset Password
-          </a>
-        </p>
-        <p>Or copy and paste this link into your browser:</p>
-        <p><a href="${resetUrl}">${resetUrl}</a></p>
-        <p>This link will expire in 1 hour. If you didn't request this reset, you can safely ignore this email.</p>
-        <p>Best regards,<br>The PillFlow Team</p>
-      `,
-      `Reset your password
+    try {
+      const resetUrl = `${process.env.SITE_URL || 'http://localhost:3000'}/reset-password?token=${args.resetToken}`;
+      
+      // Generate HTML content using template function
+      const htmlContent = generatePasswordResetEmailHTML(resetUrl);
+      
+      const emailId = await resend.sendEmail(
+        ctx,
+        "PillFlow <noreply@pillflow.com.au>",
+        args.userEmail,
+        "Reset your PillFlow password",
+        htmlContent,
+        `Reset your password
 
 You requested a password reset for your PillFlow account.
 
@@ -210,10 +178,14 @@ This link will expire in 1 hour. If you didn't request this reset, you can safel
 
 Best regards,
 The PillFlow Team`
-    );
-    
-    console.log("Password reset email queued:", emailId);
-    return emailId;
+      );
+      
+      console.log("Password reset email queued:", emailId);
+      return emailId;
+    } catch (error) {
+      console.error("Failed to send password reset email:", error);
+      throw error;
+    }
   },
 });
 
@@ -226,23 +198,23 @@ export const sendTestEmail = mutation({
     try {
       console.log("Sending test email to:", args.testEmail);
       
+      const timestamp = new Date().toISOString();
+      const siteUrl = process.env.SITE_URL;
+      const hasResendKey = !!process.env.RESEND_API_KEY;
+      
+      // Generate HTML content using template function
+      const htmlContent = generateTestEmailHTML({ 
+        timestamp, 
+        siteUrl, 
+        hasResendKey 
+      });
+      
       const emailId = await resend.sendEmail(
         ctx,
         "PillFlow <noreply@pillflow.com.au>",
         args.testEmail,
         "PillFlow Email Test",
-        `
-          <h1>Email Test Successful! ✅</h1>
-          <p>This is a test email from PillFlow to verify that email sending is working correctly.</p>
-          <p>If you received this email, then:</p>
-          <ul>
-            <li>✅ Resend API is configured correctly</li>
-            <li>✅ Email sending functionality is working</li>
-            <li>✅ Your email domain is verified</li>
-          </ul>
-          <p>Time sent: ${new Date().toISOString()}</p>
-          <p>Best regards,<br>The PillFlow Team</p>
-        `,
+        htmlContent,
         `Email Test Successful!
 
 This is a test email from PillFlow to verify that email sending is working correctly.
@@ -252,7 +224,7 @@ If you received this email, then:
 - Email sending functionality is working
 - Your email domain is verified
 
-Time sent: ${new Date().toISOString()}
+Time sent: ${timestamp}
 
 Best regards,
 The PillFlow Team`
@@ -265,7 +237,7 @@ The PillFlow Team`
       return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   },
-}); 
+});
 
 // Test invitation email sending function
 export const sendTestInvitationEmail = mutation({
@@ -278,39 +250,20 @@ export const sendTestInvitationEmail = mutation({
       
       const testToken = "TEST-1234-5678-9012";
       const joinUrl = `${process.env.SITE_URL || 'http://localhost:3000'}/signin?invite=${testToken}`;
+      const timestamp = new Date().toISOString();
+      
+      // Generate HTML content using template function
+      const htmlContent = generateTestInvitationEmailHTML({ 
+        joinUrl, 
+        timestamp 
+      });
       
       const emailId = await resend.sendEmail(
         ctx,
         "PillFlow <noreply@pillflow.com.au>",
         args.testEmail,
         "Test Invitation to PillFlow",
-        `
-          <h1>Test Invitation Email ✅</h1>
-          <p>This is a test invitation email to verify that the invitation system is working correctly.</p>
-          <p>In a real invitation, you would be joining an organization on PillFlow.</p>
-          
-          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #334155;">How it works:</h3>
-            <p style="margin-bottom: 10px;"><strong>If you already have an account:</strong> Sign in and you'll automatically join the organization.</p>
-            <p style="margin-bottom: 0;"><strong>If you're new to PillFlow:</strong> Create your account and you'll be added to the organization immediately.</p>
-          </div>
-          
-          <p style="text-align: center; margin: 30px 0;">
-            <a href="${joinUrl}" style="background-color: #0066cc; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;">
-              Test Invitation Link (Non-functional)
-            </a>
-          </p>
-          
-          <p><strong>Test URL:</strong></p>
-          <p style="background-color: #f1f5f9; padding: 10px; border-radius: 4px; font-family: monospace; word-break: break-all;">
-            <a href="${joinUrl}">${joinUrl}</a>
-          </p>
-          
-          <p><strong>✅ If you received this email, the invitation system is working correctly!</strong></p>
-          
-          <p>Time sent: ${new Date().toISOString()}</p>
-          <p>Best regards,<br>The PillFlow Team</p>
-        `,
+        htmlContent,
         `Test Invitation Email
 
 This is a test invitation email to verify that the invitation system is working correctly.
@@ -325,7 +278,7 @@ Test invitation link: ${joinUrl}
 
 ✅ If you received this email, the invitation system is working correctly!
 
-Time sent: ${new Date().toISOString()}
+Time sent: ${timestamp}
 
 Best regards,
 The PillFlow Team`
@@ -338,7 +291,7 @@ The PillFlow Team`
       return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   },
-}); 
+});
 
 // Debug function to check email sending and Resend configuration
 export const debugEmailSystem = mutation({
@@ -353,29 +306,27 @@ export const debugEmailSystem = mutation({
       // Check environment variables
       const siteUrl = process.env.SITE_URL;
       const resendKey = process.env.RESEND_API_KEY;
+      const timestamp = new Date().toISOString();
       
       console.log("🌐 SITE_URL:", siteUrl || "NOT SET");
       console.log("🔑 RESEND_API_KEY:", resendKey ? "SET (length: " + resendKey.length + ")" : "NOT SET");
       
       // Try to send a simple test email
       console.log("📤 Testing basic email sending...");
+      
+      // Generate HTML content using template function
+      const htmlContent = generateTestEmailHTML({ 
+        timestamp, 
+        siteUrl: siteUrl || "NOT SET", 
+        hasResendKey: !!resendKey 
+      });
+      
       const emailId = await resend.sendEmail(
         ctx,
         "PillFlow Debug <noreply@pillflow.com.au>",
         args.testEmail,
         "🔍 Debug: Email System Test",
-        `
-          <h1>Email System Debug Test</h1>
-          <p>This is a debug email to test the email system configuration.</p>
-          <h3>Configuration Check:</h3>
-          <ul>
-            <li>SITE_URL: ${siteUrl || "NOT SET"}</li>
-            <li>Resend API Key: ${resendKey ? "✅ Configured" : "❌ Not Set"}</li>
-            <li>Test Mode: ${process.env.NODE_ENV !== 'production' ? 'Development' : 'Production'}</li>
-            <li>Timestamp: ${new Date().toISOString()}</li>
-          </ul>
-          <p>If you received this email, the basic email system is working!</p>
-        `,
+        htmlContent,
         `Email System Debug Test
 
 This is a debug email to test the email system configuration.
@@ -384,7 +335,7 @@ Configuration Check:
 - SITE_URL: ${siteUrl || "NOT SET"}
 - Resend API Key: ${resendKey ? "✅ Configured" : "❌ Not Set"}
 - Test Mode: ${process.env.NODE_ENV !== 'production' ? 'Development' : 'Production'}
-- Timestamp: ${new Date().toISOString()}
+- Timestamp: ${timestamp}
 
 If you received this email, the basic email system is working!`
       );
@@ -398,7 +349,7 @@ If you received this email, the basic email system is working!`
           siteUrl: siteUrl || "NOT SET",
           hasResendKey: !!resendKey,
           resendKeyLength: resendKey?.length || 0,
-          timestamp: new Date().toISOString()
+          timestamp
         }
       };
     } catch (error) {
