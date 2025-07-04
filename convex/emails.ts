@@ -28,9 +28,9 @@ export const sendWelcomeEmail = internalMutation({
     userName: v.string(),
   },
   handler: async (ctx, args) => {
-    console.log("Welcome email function called for:", args.userEmail);
-    
     try {
+      console.log("Sending welcome email to:", args.userEmail);
+      
       const emailId = await resend.sendEmail(
         ctx,
         "PillFlow Onboarding <onboarding@pillflow.com.au>",
@@ -63,11 +63,12 @@ Best regards,
 The PillFlow Team`
       );
       
-      console.log("Welcome email queued:", emailId);
+      console.log("Welcome email queued successfully:", emailId);
       return emailId;
     } catch (error) {
-      console.error("Error sending welcome email:", error);
-      throw error;
+      console.error("Failed to send welcome email:", error);
+      // Don't throw - we don't want email failures to break user creation
+      return null;
     }
   },
 });

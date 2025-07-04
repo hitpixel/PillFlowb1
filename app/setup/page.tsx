@@ -90,7 +90,7 @@ export default function SetupPage() {
     }
   }, [isAuthenticated, isLoading, setupStatus, router]);
 
-  if (isLoading || !setupStatus || !userProfile) {
+  if (isLoading || !setupStatus) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -343,7 +343,7 @@ export default function SetupPage() {
                           id="firstName"
                           name="firstName"
                           type="text"
-                          value={userProfile.firstName}
+                          value={userProfile?.firstName || ""}
                           disabled
                           className="bg-muted h-9"
                         />
@@ -354,7 +354,7 @@ export default function SetupPage() {
                           id="lastName"
                           name="lastName"
                           type="text"
-                          value={userProfile.lastName}
+                          value={userProfile?.lastName || ""}
                           disabled
                           className="bg-muted h-9"
                         />
@@ -367,7 +367,7 @@ export default function SetupPage() {
                         id="email"
                         name="email"
                         type="email"
-                        value={userProfile.email}
+                        value={userProfile?.email || ""}
                         disabled
                         className="bg-muted h-9"
                       />

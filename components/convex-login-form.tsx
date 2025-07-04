@@ -92,12 +92,18 @@ export function ConvexLoginForm({
       
       if (flow === "signUp") {
         // Create user profile after successful signup
-        await createUserProfile({
-          firstName: formData.get("name") as string,
-          lastName: formData.get("lastName") as string,
-          email: formData.get("email") as string,
-        });
-        // Redirect to setup
+        try {
+          await createUserProfile({
+            firstName: formData.get("name") as string,
+            lastName: formData.get("lastName") as string,
+            email: formData.get("email") as string,
+          });
+        } catch (profileError) {
+          // Log profile creation error but don't block the redirect
+          console.error("Profile creation failed:", profileError);
+          // The user authentication succeeded, so let them proceed to setup
+        }
+        // Always redirect to setup after successful signup
         router.push("/setup");
       } else {
         // Sign in - redirect to dashboard
