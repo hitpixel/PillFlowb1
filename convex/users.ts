@@ -39,7 +39,7 @@ export const createUserProfile = mutation({
     });
 
     // Send welcome email to the new user
-    await ctx.scheduler.runAfter(0, internal.emails.sendWelcomeEmail, {
+    ctx.scheduler.runAfter(0, internal.emails.sendWelcomeEmail, {
       userEmail: args.email,
       userName: args.firstName,
     });
