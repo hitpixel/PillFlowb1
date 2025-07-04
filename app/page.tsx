@@ -21,12 +21,13 @@ import {
 } from "@/components/ui/sidebar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Activity, Users, Plus, TrendingUp, AlertTriangle } from "lucide-react";
+import { Activity, Users, Plus, TrendingUp, AlertTriangle, Pill, Shield, CheckCircle, XCircle } from "lucide-react";
 
 export default function HomePage() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const setupStatus = useQuery(api.users.getSetupStatus);
   const userProfile = useQuery(api.users.getCurrentUserProfile);
+  const organization = useQuery(api.users.getOrganization);
   const router = useRouter();
 
   useEffect(() => {
@@ -96,6 +97,88 @@ export default function HomePage() {
               Here&apos;s an overview of your healthcare management dashboard
             </p>
           </div>
+
+          {/* Feature Access Indicator */}
+          {organization && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-primary" />
+                  {organization.type === "pharmacy" ? "Pharmacy" : 
+                   organization.type === "gp_clinic" ? "GP Clinic" :
+                   organization.type === "hospital" ? "Hospital" : 
+                   "Aged Care"} Dashboard Features
+                </CardTitle>
+                <CardDescription>
+                  Your organization type determines which features are available
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Core Features - Available to all */}
+                  <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <div>
+                      <p className="font-medium text-green-800">Patient Management</p>
+                      <p className="text-xs text-green-600">Full access</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <div>
+                      <p className="font-medium text-green-800">Compliance Tracking</p>
+                      <p className="text-xs text-green-600">Full access</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <div>
+                      <p className="font-medium text-green-800">Team Management</p>
+                      <p className="text-xs text-green-600">Full access</p>
+                    </div>
+                  </div>
+
+                  {/* Medication Features - Only for Pharmacies */}
+                  <div className={`flex items-center gap-2 p-3 rounded-lg border ${
+                    organization.type === "pharmacy" 
+                      ? "bg-green-50 border-green-200" 
+                      : "bg-gray-50 border-gray-200"
+                  }`}>
+                    {organization.type === "pharmacy" ? (
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-gray-400" />
+                    )}
+                    <div>
+                      <p className={`font-medium ${
+                        organization.type === "pharmacy" ? "text-green-800" : "text-gray-500"
+                      }`}>
+                        <Pill className="h-3 w-3 inline mr-1" />
+                        Medication Management
+                      </p>
+                      <p className={`text-xs ${
+                        organization.type === "pharmacy" ? "text-green-600" : "text-gray-400"
+                      }`}>
+                        {organization.type === "pharmacy" ? "Full access" : "Not available"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                {organization.type !== "pharmacy" && (
+                  <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-sm text-blue-800">
+                      <strong>ℹ️ Note:</strong> Medication management features are designed specifically for pharmacy operations. 
+                      Your {organization.type.replace("_", " ")} organization has access to all other PillFlow features 
+                      including patient care, compliance tracking, and team collaboration tools.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quick Stats */}
           <div className="grid auto-rows-min gap-4 md:grid-cols-4">

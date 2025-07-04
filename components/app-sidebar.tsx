@@ -14,6 +14,8 @@ import {
   Shield,
   Calendar,
 } from "lucide-react"
+import { useQuery } from "convex/react"
+import { api } from "@/convex/_generated/api"
 
 import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
@@ -27,31 +29,10 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-// PillFlow-specific data.
-const data = {
-  user: {
-    name: "Healthcare Professional",
-    email: "user@pillflow.com",
-    avatar: "/avatars/user.jpg",
-  },
-  teams: [
-    {
-      name: "PillFlow Health",
-      logo: GalleryVerticalEnd,
-      plan: "Professional",
-    },
-    {
-      name: "Regional Clinic",
-      logo: Building2,
-      plan: "Enterprise",
-    },
-    {
-      name: "Community Pharmacy",
-      logo: Pill,
-      plan: "Standard",
-    },
-  ],
-  navMain: [
+// Function to generate navigation based on organization type
+const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospital" | "aged_care") => {
+  // Base navigation items that all organization types have
+  const baseNavItems = [
     {
       title: "Dashboard",
       url: "/",
@@ -95,29 +76,35 @@ const data = {
         },
       ],
     },
-    {
-      title: "Medications",
-      url: "/medications",
-      icon: Pill,
-      items: [
-        {
-          title: "Active Medications",
-          url: "/medications/active",
-        },
-        {
-          title: "Medication Library",
-          url: "/medications/library",
-        },
-        {
-          title: "Prescriptions",
-          url: "/medications/prescriptions",
-        },
-        {
-          title: "Interactions",
-          url: "/medications/interactions",
-        },
-      ],
-    },
+  ];
+
+  // Medications section - only for pharmacies
+  const medicationsSection = {
+    title: "Medications",
+    url: "/medications",
+    icon: Pill,
+    items: [
+      {
+        title: "Active Medications",
+        url: "/medications/active",
+      },
+      {
+        title: "Medication Library",
+        url: "/medications/library",
+      },
+      {
+        title: "Prescriptions",
+        url: "/medications/prescriptions",
+      },
+      {
+        title: "Interactions",
+        url: "/medications/interactions",
+      },
+    ],
+  };
+
+  // Common sections for all organization types
+  const commonSections = [
     {
       title: "Compliance",
       url: "/compliance",
@@ -183,32 +170,85 @@ const data = {
         },
       ],
     },
-  ],
-  projects: [
-    {
-      name: "Medication Reviews",
-      url: "/projects/reviews",
-      icon: FileText,
+  ];
+
+  // Build navigation array based on organization type
+  const navMain = [...baseNavItems];
+  
+  // Only add medications section for pharmacy organizations
+  if (organizationType === "pharmacy") {
+    navMain.push(medicationsSection);
+  }
+  
+  navMain.push(...commonSections);
+
+  // Projects also vary by organization type
+  const getProjects = () => {
+    const baseProjects = [
+      {
+        name: "Patient Onboarding",
+        url: "/projects/onboarding",
+        icon: UserPlus,
+      },
+      {
+        name: "Compliance Monitoring",
+        url: "/projects/monitoring",
+        icon: Shield,
+      },
+      {
+        name: "Scheduled Tasks",
+        url: "/projects/tasks",
+        icon: Calendar,
+      },
+    ];
+
+    // Add medication-related projects only for pharmacies
+    if (organizationType === "pharmacy") {
+      baseProjects.unshift({
+        name: "Medication Reviews",
+        url: "/projects/reviews",
+        icon: FileText,
+      });
+    }
+
+    return baseProjects;
+  };
+
+  return {
+    user: {
+      name: "Healthcare Professional",
+      email: "user@pillflow.com",
+      avatar: "/avatars/user.jpg",
     },
-    {
-      name: "Patient Onboarding",
-      url: "/projects/onboarding",
-      icon: UserPlus,
-    },
-    {
-      name: "Compliance Monitoring",
-      url: "/projects/monitoring",
-      icon: Shield,
-    },
-    {
-      name: "Scheduled Tasks",
-      url: "/projects/tasks",
-      icon: Calendar,
-    },
-  ],
-}
+    teams: [
+      {
+        name: "PillFlow Health",
+        logo: GalleryVerticalEnd,
+        plan: "Professional",
+      },
+      {
+        name: "Regional Clinic",
+        logo: Building2,
+        plan: "Enterprise",
+      },
+      {
+        name: "Community Pharmacy",
+        logo: Pill,
+        plan: "Standard",
+      },
+    ],
+    navMain,
+    projects: getProjects(),
+  };
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  // Get current user's organization to determine navigation access
+  const organization = useQuery(api.users.getOrganization);
+  
+  // Generate navigation data based on organization type
+  const data = getNavigationData(organization?.type);
+  
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
