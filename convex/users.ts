@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { auth } from "./auth";
+import { internal } from "./_generated/api";
 
 // Create user profile after signup
 export const createUserProfile = mutation({
@@ -35,6 +36,12 @@ export const createUserProfile = mutation({
       setupCompleted: false,
       createdAt: Date.now(),
       isActive: true,
+    });
+
+    // Send welcome email to the new user
+    await ctx.scheduler.runAfter(0, internal.emails.sendWelcomeEmail, {
+      userEmail: args.email,
+      userName: args.firstName,
     });
 
     return profileId;

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.81",
+    "@convex-dev/resend": "^0.1.2-beta.2",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-collapsible": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.14",
