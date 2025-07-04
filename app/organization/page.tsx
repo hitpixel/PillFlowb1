@@ -17,7 +17,8 @@ import {
   Eye,
   Settings,
   UserPlus,
-  ExternalLink
+  ExternalLink,
+  Copy
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -107,8 +108,11 @@ export default function OrganizationOverviewPage() {
   const [inviteRole, setInviteRole] = useState<"admin" | "member" | "viewer">("member");
   const [isInviting, setIsInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [createdInvite, setCreatedInvite] = useState<{token: string; email: string} | null>(null);
+  const [isEmailSending, setIsEmailSending] = useState(false);
   
   // Mutations
+  const createInvitation = useMutation(api.users.createMemberInvitation);
   const inviteUser = useMutation(api.users.inviteUserToOrganization);
   const sendTestEmail = useMutation(api.emails.sendTestEmail);
   const sendTestInvitationEmail = useMutation(api.emails.sendTestInvitationEmail);
@@ -156,7 +160,7 @@ export default function OrganizationOverviewPage() {
 
 
 
-  const handleInviteUser = async (e: React.FormEvent) => {
+  const handleCreateInvitation = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!inviteEmail.trim()) {
@@ -168,21 +172,57 @@ export default function OrganizationOverviewPage() {
     setInviteError(null);
     
     try {
-      await inviteUser({
+      const result = await createInvitation({
         email: inviteEmail.trim(),
         role: inviteRole,
       });
       
-      setSuccess(`Invitation sent to ${inviteEmail}!`);
+      setCreatedInvite({
+        token: result.inviteToken,
+        email: inviteEmail.trim(),
+      });
+      
+      setSuccess(`Invitation created for ${inviteEmail}!`);
       setInviteEmail("");
       setInviteRole("member");
       setTimeout(() => setSuccess(null), 5000);
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to send invitation";
+      const errorMessage = error instanceof Error ? error.message : "Failed to create invitation";
       setInviteError(errorMessage);
     } finally {
       setIsInviting(false);
     }
+  };
+
+  const handleSendDirectEmail = async () => {
+    if (!createdInvite) {
+      setInviteError("Please create an invitation first");
+      return;
+    }
+    
+    setIsEmailSending(true);
+    setInviteError(null);
+    
+    try {
+      await inviteUser({
+        email: createdInvite.email,
+        role: inviteRole,
+      });
+      
+      setSuccess(`Email sent to ${createdInvite.email}!`);
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send email";
+      setInviteError(errorMessage);
+    } finally {
+      setIsEmailSending(false);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setSuccess("Invitation token copied to clipboard!");
+    setTimeout(() => setSuccess(null), 2000);
   };
 
   const handleTestEmail = async () => {
@@ -490,7 +530,7 @@ export default function OrganizationOverviewPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleInviteUser} className="space-y-4">
+                <form onSubmit={handleCreateInvitation} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="inviteEmail">Email Address *</Label>
@@ -532,12 +572,12 @@ export default function OrganizationOverviewPage() {
                       {isInviting ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Sending Invitation...
+                          Creating Invitation...
                         </>
                       ) : (
                         <>
                           <UserPlus className="w-4 h-4 mr-2" />
-                          Send Invitation
+                          Create Invitation
                         </>
                       )}
                     </Button>
@@ -571,10 +611,73 @@ export default function OrganizationOverviewPage() {
                   </div>
                 </form>
                 
+                {createdInvite && (
+                  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="font-medium text-green-800 mb-2">Invitation Created!</p>
+                    <p className="text-sm text-green-700 mb-3">
+                      Choose how to share this invitation with {createdInvite.email}:
+                    </p>
+                    
+                    <div className="space-y-3">
+                      {/* Token copy option */}
+                      <div className="p-3 bg-white rounded border">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Option 1: Copy Token</p>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={createdInvite.token}
+                            readOnly
+                            className="font-mono text-sm"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => copyToClipboard(createdInvite.token)}
+                          >
+                            <Copy className="w-4 h-4 mr-1" />
+                            Copy
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Send this token to the user manually. They can enter it at the signup page.
+                        </p>
+                      </div>
+                      
+                      {/* Email sending option */}
+                      <div className="p-3 bg-white rounded border">
+                        <p className="text-sm font-medium text-gray-700 mb-2">Option 2: Send Email</p>
+                        <Button
+                          onClick={handleSendDirectEmail}
+                          disabled={isEmailSending}
+                          className="w-full"
+                        >
+                          {isEmailSending ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              Sending Email...
+                            </>
+                          ) : (
+                            <>
+                              <Mail className="w-4 h-4 mr-2" />
+                              Send Email to {createdInvite.email}
+                            </>
+                          )}
+                        </Button>
+                        <p className="text-xs text-gray-600 mt-1">
+                          Send the invitation directly to the user&apos;s email address.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <p className="text-xs text-green-600 mt-3">
+                      This invitation expires in 7 days
+                    </p>
+                  </div>
+                )}
+                
                 <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
                   <p className="text-sm text-blue-800">
-                    <strong>Note:</strong> The invited user will receive an email with instructions to join your organization. 
-                    They can also create a new account using the invitation link if they don&apos;t have one.
+                    <strong>Note:</strong> Create an invitation first, then choose to either copy the token manually or send it via email. 
+                    The user can create a new account using the invitation token if they don&apos;t have one.
                   </p>
                 </div>
               </CardContent>
