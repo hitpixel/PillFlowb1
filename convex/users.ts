@@ -660,13 +660,29 @@ export const joinOrganization = mutation({
       throw new Error("User already belongs to an organization");
     }
 
+    console.log("Looking for organization with access token:", args.accessToken.toUpperCase());
+    
     const organization = await ctx.db
       .query("organizations")
       .withIndex("by_access_token", q => q.eq("accessToken", args.accessToken.toUpperCase()))
       .first();
 
-    if (!organization || !organization.isActive) {
-      throw new Error("Invalid access token or organization not found");
+    if (!organization) {
+      // Check if they're using an invitation token instead
+      const invitation = await ctx.db
+        .query("memberInvitations")
+        .withIndex("by_invite_token", q => q.eq("inviteToken", args.accessToken.toUpperCase()))
+        .first();
+      
+      if (invitation) {
+        throw new Error("This appears to be an invitation token. Please use the invitation link from your email instead, or sign in at /signin?invite=" + args.accessToken);
+      }
+      
+      throw new Error("Invalid access token. Organization not found. Access tokens are in the format XXX-XXX-XXX-XXX (3 characters per group).");
+    }
+    
+    if (!organization.isActive) {
+      throw new Error("This organization is no longer active");
     }
 
     // Update user profile
@@ -760,15 +776,18 @@ export const inviteUserToOrganization = mutation({
 
     // Send invitation email
     try {
+      console.log("Scheduling invitation email for:", args.email);
       await ctx.scheduler.runAfter(0, internal.emails.sendOrganizationInvite, {
         inviteEmail: args.email,
         organizationName: organization.name,
         inviterName: `${profile.firstName} ${profile.lastName}`,
         inviteToken,
       });
+      console.log("Invitation email scheduled successfully");
     } catch (error) {
-      console.error("Failed to send invitation email:", error);
+      console.error("Failed to schedule invitation email:", error);
       // Don't fail the invitation creation if email fails
+      // But we should still return the token so the admin can manually share it
     }
 
     return { invitationId, inviteToken };

@@ -111,6 +111,7 @@ export default function OrganizationOverviewPage() {
   
   // Mutations
   const inviteUser = useMutation(api.users.inviteUserToOrganization);
+  const sendTestEmail = useMutation(api.emails.sendTestEmail);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -181,6 +182,34 @@ export default function OrganizationOverviewPage() {
       setTimeout(() => setSuccess(null), 5000);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to send invitation";
+      setInviteError(errorMessage);
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!inviteEmail.trim()) {
+      setInviteError("Please enter an email address to test");
+      return;
+    }
+    
+    setIsInviting(true);
+    setInviteError(null);
+    
+    try {
+      const result = await sendTestEmail({
+        testEmail: inviteEmail.trim(),
+      });
+      
+      if (result.success) {
+        setSuccess(`Test email sent to ${inviteEmail}! Check your inbox.`);
+      } else {
+        setInviteError(`Test email failed: ${result.error}`);
+      }
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send test email";
       setInviteError(errorMessage);
     } finally {
       setIsInviting(false);
@@ -453,19 +482,30 @@ export default function OrganizationOverviewPage() {
                     </div>
                   )}
                   
-                  <Button type="submit" disabled={isInviting} className="w-full md:w-auto">
-                    {isInviting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Sending Invitation...
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Send Invitation
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={isInviting} className="flex-1 md:flex-none">
+                      {isInviting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Sending Invitation...
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Send Invitation
+                        </>
+                      )}
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      disabled={isInviting}
+                      onClick={handleTestEmail}
+                      className="px-4"
+                    >
+                      Test Email
+                    </Button>
+                  </div>
                 </form>
                 
                 <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
