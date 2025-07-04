@@ -58,28 +58,44 @@ export const updateUserProfile = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    const userId = await auth.getUserId(ctx);
-    if (!userId) {
-      throw new Error("User must be authenticated");
+    try {
+      const userId = await auth.getUserId(ctx);
+      if (!userId) {
+        throw new Error("User must be authenticated");
+      }
+
+      const profile = await ctx.db
+        .query("userProfiles")
+        .withIndex("by_user_id", q => q.eq("userId", userId))
+        .first();
+
+      if (!profile) {
+        throw new Error("User profile not found. Please try signing out and signing back in.");
+      }
+
+      console.log("Updating user profile for user:", userId, "with data:", args);
+
+      // Validate inputs
+      if (!args.phoneNumber?.trim()) {
+        throw new Error("Phone number is required");
+      }
+      if (!args.aphraRegistrationNumber?.trim()) {
+        throw new Error("APHRA registration number is required");
+      }
+
+      await ctx.db.patch(profile._id, {
+        phoneNumber: args.phoneNumber.trim(),
+        aphraRegistrationNumber: args.aphraRegistrationNumber.trim(),
+        healthcareProfessionalType: args.healthcareProfessionalType,
+        profileCompleted: true,
+      });
+
+      console.log("Profile updated successfully for user:", userId);
+      return profile._id;
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      throw error;
     }
-
-    const profile = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_user_id", q => q.eq("userId", userId))
-      .first();
-
-    if (!profile) {
-      throw new Error("User profile not found");
-    }
-
-    await ctx.db.patch(profile._id, {
-      phoneNumber: args.phoneNumber,
-      aphraRegistrationNumber: args.aphraRegistrationNumber,
-      healthcareProfessionalType: args.healthcareProfessionalType,
-      profileCompleted: true,
-    });
-
-    return profile._id;
   },
 });
 

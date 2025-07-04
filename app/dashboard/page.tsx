@@ -46,11 +46,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // Send welcome email on first dashboard visit
-    if (isAuthenticated && userProfile && !userProfile.welcomeEmailSent) {
+    // Check if user profile exists and hasn't received welcome email yet
+    if (isAuthenticated && userProfile && userProfile.welcomeEmailSent !== true) {
       sendWelcomeEmail()
         .then((result) => {
-          if (result?.success) {
-            console.log("Welcome email sent successfully");
+          if (result?.success && !result?.alreadySent) {
+            console.log("Welcome email sent successfully on first dashboard visit");
           }
         })
         .catch((error) => {
@@ -108,7 +109,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  {userProfile.welcomeEmailSent ? 
+                  {userProfile.welcomeEmailSent === true ? 
                     "Check your email for your welcome message and getting started guide." :
                     "We're preparing your welcome email with getting started information."
                   }
