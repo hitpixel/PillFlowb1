@@ -61,12 +61,11 @@ export default defineSchema({
     postcode: v.string(),
     country: v.string(),
     abn: v.string(),
-    accessToken: v.string(), // For joining organization
+    // accessToken removed - only use invitation tokens for security
     ownerId: v.id("userProfiles"),
     createdAt: v.float64(),
     isActive: v.boolean(),
   })
-    .index("by_access_token", ["accessToken"])
     .index("by_owner", ["ownerId"])
     .index("by_email", ["email"]),
 

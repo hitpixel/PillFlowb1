@@ -409,29 +409,21 @@ export default function OrganizationOverviewPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Access Token</CardTitle>
+              <CardTitle>Team Management</CardTitle>
               <CardDescription>
-                Share this token with new members to join your organization
+                Invite new members to join your organization
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Input
-                  value={organization.accessToken}
-                  readOnly
-                  className="font-mono"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => copyToClipboard(organization.accessToken)}
-                >
-                  <Copy className="w-4 h-4" />
-                </Button>
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
+                <p className="text-sm text-blue-800 font-medium mb-2">
+                  🔐 Secure Invitation System
+                </p>
+                <p className="text-sm text-blue-700">
+                  All team members must be invited via email for security. 
+                  Use the invite form below to send secure invitation links to new team members.
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                This token allows new members to join your organization. Keep it secure and only share with trusted individuals.
-              </p>
             </CardContent>
           </Card>
 

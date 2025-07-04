@@ -187,16 +187,7 @@ export const sendWelcomeEmailOnDashboard = mutation({
   },
 });
 
-// Generate secure access token for organization
-function generateAccessToken(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 12; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  // Format as XXX-XXX-XXX-XXX for readability
-  return result.match(/.{1,3}/g)?.join('-') || result;
-}
+// Access tokens removed - only use invitation tokens for security
 
 // Generate secure invitation token (different format)
 function generateInviteToken(): string {
@@ -259,18 +250,7 @@ export const createOrganization = mutation({
       throw new Error("User already belongs to an organization");
     }
 
-    // Generate unique access token
-    let accessToken: string;
-    let existing;
-    do {
-      accessToken = generateAccessToken();
-      existing = await ctx.db
-        .query("organizations")
-        .withIndex("by_access_token", q => q.eq("accessToken", accessToken))
-        .first();
-    } while (existing);
-
-    // Create organization
+    // Create organization (no access token needed - only invitation tokens)
     const orgId = await ctx.db.insert("organizations", {
       name: args.name,
       type: args.type,
@@ -284,7 +264,6 @@ export const createOrganization = mutation({
       postcode: args.postcode,
       country: "Australia",
       abn: args.abn,
-      accessToken,
       ownerId: profile._id,
       createdAt: Date.now(),
       isActive: true,
@@ -297,7 +276,7 @@ export const createOrganization = mutation({
       setupCompleted: true,
     });
 
-    return { organizationId: orgId, accessToken };
+    return { organizationId: orgId };
   },
 });
 
@@ -662,89 +641,8 @@ export const createPartnership = mutation({
   },
 });
 
-// Search organization by access token
-export const findOrganizationByToken = query({
-  args: {
-    accessToken: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const organization = await ctx.db
-      .query("organizations")
-      .withIndex("by_access_token", q => q.eq("accessToken", args.accessToken.toUpperCase()))
-      .first();
-
-    if (!organization || !organization.isActive) {
-      return null;
-    }
-
-    return {
-      _id: organization._id,
-      name: organization.name,
-      type: organization.type,
-      contactPersonName: organization.contactPersonName,
-    };
-  },
-});
-
-// Join organization
-export const joinOrganization = mutation({
-  args: {
-    accessToken: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const userId = await auth.getUserId(ctx);
-    if (!userId) {
-      throw new Error("User must be authenticated");
-    }
-
-    const profile = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_user_id", q => q.eq("userId", userId))
-      .first();
-
-    if (!profile) {
-      throw new Error("User profile not found");
-    }
-
-    if (profile.organizationId) {
-      throw new Error("User already belongs to an organization");
-    }
-
-    console.log("Looking for organization with access token:", args.accessToken.toUpperCase());
-    
-    const organization = await ctx.db
-      .query("organizations")
-      .withIndex("by_access_token", q => q.eq("accessToken", args.accessToken.toUpperCase()))
-      .first();
-
-    if (!organization) {
-      // Check if they're using an invitation token instead
-      const invitation = await ctx.db
-        .query("memberInvitations")
-        .withIndex("by_invite_token", q => q.eq("inviteToken", args.accessToken.toUpperCase()))
-        .first();
-      
-      if (invitation) {
-        throw new Error("This appears to be an invitation token. Please use the invitation link from your email instead, or sign in at /signin?invite=" + args.accessToken);
-      }
-      
-      throw new Error("Invalid access token. Organization not found. Access tokens are in the format XXX-XXX-XXX-XXX (3 characters per group).");
-    }
-    
-    if (!organization.isActive) {
-      throw new Error("This organization is no longer active");
-    }
-
-    // Update user profile
-    await ctx.db.patch(profile._id, {
-      organizationId: organization._id,
-      role: "member",
-      setupCompleted: true,
-    });
-
-    return { organizationId: organization._id };
-  },
-});
+// Access token functions removed - only use invitation tokens for security
+// Users can only join organizations through email invitations now
 
 // Invite user to organization
 export const inviteUserToOrganization = mutation({
