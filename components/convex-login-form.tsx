@@ -176,7 +176,7 @@ export function ConvexLoginForm({
             <div className="mb-4 p-3 bg-blue-50 rounded-md border border-blue-200">
               <p className="text-sm text-blue-800">
                 <strong>✉️ Organization Invitation Active</strong><br />
-                You'll automatically join the organization after creating your account or signing in.
+                                 You&apos;ll automatically join the organization after creating your account or signing in.
               </p>
             </div>
           )}
