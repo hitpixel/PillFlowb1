@@ -11,6 +11,8 @@ export const createUserProfile = mutation({
     email: v.string(),
   },
   handler: async (ctx, args) => {
+    console.log("createUserProfile called for:", args.email);
+    
     const userId = await auth.getUserId(ctx);
     if (!userId) {
       throw new Error("User must be authenticated");
@@ -23,10 +25,12 @@ export const createUserProfile = mutation({
       .first();
 
     if (existingProfile) {
+      console.log("Profile already exists for user:", args.email);
       return existingProfile._id;
     }
 
     // Create new profile
+    console.log("Creating new profile for user:", args.email);
     const profileId = await ctx.db.insert("userProfiles", {
       userId,
       firstName: args.firstName,
@@ -38,12 +42,21 @@ export const createUserProfile = mutation({
       isActive: true,
     });
 
-    // Send welcome email to the new user
-    ctx.scheduler.runAfter(0, internal.emails.sendWelcomeEmail, {
-      userEmail: args.email,
-      userName: args.firstName,
-    });
+    // Send welcome email to the new user (TEMPORARILY DISABLED FOR DEBUGGING)
+    console.log("Would schedule welcome email for:", args.email);
+    // TODO: Re-enable after debugging
+    // try {
+    //   ctx.scheduler.runAfter(0, internal.emails.sendWelcomeEmail, {
+    //     userEmail: args.email,
+    //     userName: args.firstName,
+    //   });
+    //   console.log("Welcome email scheduled successfully");
+    // } catch (error) {
+    //   console.error("Error scheduling welcome email:", error);
+    //   // Don't throw - let user creation continue
+    // }
 
+    console.log("User profile created successfully:", profileId);
     return profileId;
   },
 });
@@ -110,7 +123,10 @@ export const getSetupStatus = query({
   args: {},
   handler: async (ctx) => {
     const userId = await auth.getUserId(ctx);
+    console.log("getSetupStatus called for userId:", userId);
+    
     if (!userId) {
+      console.log("No userId found, returning needsSetup: true");
       return { needsSetup: true, hasProfile: false, needsProfileCompletion: false };
     }
 
@@ -119,16 +135,22 @@ export const getSetupStatus = query({
       .withIndex("by_user_id", q => q.eq("userId", userId))
       .first();
 
+    console.log("Profile found:", profile ? "yes" : "no");
+    
     if (!profile) {
+      console.log("No profile found, returning needsSetup: true");
       return { needsSetup: true, hasProfile: false, needsProfileCompletion: false };
     }
 
-    return {
+    const status = {
       needsSetup: !profile.setupCompleted,
       hasProfile: true,
       needsProfileCompletion: !profile.profileCompleted,
       hasOrganization: !!profile.organizationId,
     };
+    
+    console.log("Setup status:", status);
+    return status;
   },
 });
 

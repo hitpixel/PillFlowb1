@@ -28,25 +28,28 @@ export const sendWelcomeEmail = internalMutation({
     userName: v.string(),
   },
   handler: async (ctx, args) => {
-    const emailId = await resend.sendEmail(
-      ctx,
-      "PillFlow Onboarding <onboarding@pillflow.com.au>",
-      args.userEmail,
-      "Welcome to PillFlow!",
-      `
-        <h1>Welcome to PillFlow, ${args.userName}!</h1>
-        <p>Thank you for joining our healthcare medication management platform.</p>
-        <p>Get started by:</p>
-        <ul>
-          <li>Completing your professional profile</li>
-          <li>Setting up your organization</li>
-          <li>Inviting team members</li>
-        </ul>
-        <p>If you have any questions, feel free to reach out to our support team.</p>
-        <p>Best regards,<br>The PillFlow Team</p>
-      `,
-      `Welcome to PillFlow, ${args.userName}!
-      
+    console.log("Welcome email function called for:", args.userEmail);
+    
+    try {
+      const emailId = await resend.sendEmail(
+        ctx,
+        "PillFlow Onboarding <onboarding@pillflow.com.au>",
+        args.userEmail,
+        "Welcome to PillFlow!",
+        `
+          <h1>Welcome to PillFlow, ${args.userName}!</h1>
+          <p>Thank you for joining our healthcare medication management platform.</p>
+          <p>Get started by:</p>
+          <ul>
+            <li>Completing your professional profile</li>
+            <li>Setting up your organization</li>
+            <li>Inviting team members</li>
+          </ul>
+          <p>If you have any questions, feel free to reach out to our support team.</p>
+          <p>Best regards,<br>The PillFlow Team</p>
+        `,
+        `Welcome to PillFlow, ${args.userName}!
+        
 Thank you for joining our healthcare medication management platform.
 
 Get started by:
@@ -58,10 +61,14 @@ If you have any questions, feel free to reach out to our support team.
 
 Best regards,
 The PillFlow Team`
-    );
-    
-    console.log("Welcome email queued:", emailId);
-    return emailId;
+      );
+      
+      console.log("Welcome email queued:", emailId);
+      return emailId;
+    } catch (error) {
+      console.error("Error sending welcome email:", error);
+      throw error;
+    }
   },
 });
 
