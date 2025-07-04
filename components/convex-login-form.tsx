@@ -19,6 +19,7 @@ export function ConvexLoginForm({
   className,
 }: ConvexLoginFormProps) {
   const { signIn } = useAuthActions();
+  const createUserProfile = useMutation(api.users.createUserProfile);
   const router = useRouter();
   
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
@@ -90,13 +91,13 @@ export function ConvexLoginForm({
       await signIn("password", formData);
       
       if (flow === "signUp") {
-        // Store signup data in localStorage temporarily for setup page
-        localStorage.setItem("signupData", JSON.stringify({
+        // Create user profile after successful signup
+        await createUserProfile({
           firstName: formData.get("name") as string,
           lastName: formData.get("lastName") as string,
           email: formData.get("email") as string,
-        }));
-        // Redirect to setup - profile creation will happen there
+        });
+        // Redirect to setup
         router.push("/setup");
       } else {
         // Sign in - redirect to dashboard

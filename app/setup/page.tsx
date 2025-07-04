@@ -53,7 +53,6 @@ export default function SetupPage() {
   const setupStatus = useQuery(api.users.getSetupStatus);
   const userProfile = useQuery(api.users.getCurrentUserProfile);
   const updateUserProfile = useMutation(api.users.updateUserProfile);
-  const createUserProfile = useMutation(api.users.createUserProfile);
   const createOrganization = useMutation(api.users.createOrganization);
   const joinOrganization = useMutation(api.users.joinOrganization);
   
@@ -63,7 +62,6 @@ export default function SetupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchToken, setSearchToken] = useState<string>("");
   const [createdOrgData, setCreatedOrgData] = useState<{name: string; accessToken: string} | null>(null);
-  const [profileCreated, setProfileCreated] = useState(false);
 
   // Query for organization search - only when we have a search token
   const findOrganization = useQuery(
@@ -72,22 +70,9 @@ export default function SetupPage() {
   );
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      // Handle profile creation for new signups
-      const signupData = localStorage.getItem("signupData");
-      if (signupData && !profileCreated && !userProfile) {
-        const data = JSON.parse(signupData);
-        createUserProfile({
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-        }).then(() => {
-          setProfileCreated(true);
-          localStorage.removeItem("signupData");
-        }).catch((error) => {
-          console.error("Error creating profile:", error);
-          setError("Failed to create profile. Please try again.");
-        });
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        router.push("/signin");
         return;
       }
       
@@ -103,29 +88,14 @@ export default function SetupPage() {
         setCurrentStep("choice");
       }
     }
-    
-    if (!isLoading && !isAuthenticated) {
-      router.push("/signin");
-    }
-  }, [isAuthenticated, isLoading, setupStatus, userProfile, profileCreated, createUserProfile, router]);
+  }, [isAuthenticated, isLoading, setupStatus, router]);
 
-  if (isLoading || !isAuthenticated) {
+  if (isLoading || !setupStatus || !userProfile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
           <p className="mt-4 text-lg text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!setupStatus || (!userProfile && !localStorage.getItem("signupData"))) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-lg text-gray-600">Setting up your account...</p>
         </div>
       </div>
     );
@@ -373,7 +343,7 @@ export default function SetupPage() {
                           id="firstName"
                           name="firstName"
                           type="text"
-                          value={userProfile?.firstName || ""}
+                          value={userProfile.firstName}
                           disabled
                           className="bg-muted h-9"
                         />
@@ -384,7 +354,7 @@ export default function SetupPage() {
                           id="lastName"
                           name="lastName"
                           type="text"
-                          value={userProfile?.lastName || ""}
+                          value={userProfile.lastName}
                           disabled
                           className="bg-muted h-9"
                         />
@@ -397,7 +367,7 @@ export default function SetupPage() {
                         id="email"
                         name="email"
                         type="email"
-                                                  value={userProfile?.email || ""}
+                        value={userProfile.email}
                         disabled
                         className="bg-muted h-9"
                       />
