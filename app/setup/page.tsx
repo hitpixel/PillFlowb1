@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
-import { Building2, GalleryVerticalEnd } from "lucide-react";
+import { Building2, GalleryVerticalEnd, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProgressSteps } from "@/components/ui/progress-steps";
 
-type SetupStep = "profile" | "choice" | "create";
+type SetupStep = "profile" | "choice" | "create" | "join";
 
 function ProgressIndicator({ steps, currentStep, completedSteps }: { 
   steps: { id: string; name: string; description: string }[];
@@ -33,12 +33,14 @@ export default function SetupPage() {
   const userProfile = useQuery(api.users.getCurrentUserProfile);
   const updateUserProfile = useMutation(api.users.updateUserProfile);
   const createOrganization = useMutation(api.users.createOrganization);
+  const acceptInvitation = useMutation(api.users.acceptInvitation);
   
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<SetupStep>("profile");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdOrgData, setCreatedOrgData] = useState<{name: string} | null>(null);
+  const [joinedOrgData, setJoinedOrgData] = useState<{name: string} | null>(null);
 
   useEffect(() => {
     if (!isLoading) {
@@ -65,12 +67,14 @@ export default function SetupPage() {
     { id: "profile", name: "Profile", description: "Complete your professional details" },
     { id: "choice", name: "Setup", description: "Choose organization path" },
     { id: "create", name: "Organization", description: "Create your organization" },
+    { id: "join", name: "Join", description: "Join existing organization" },
   ];
 
   const getCompletedSteps = () => {
     if (currentStep === "profile") return [];
     if (currentStep === "choice") return ["profile"];
     if (currentStep === "create") return ["profile", "choice"];
+    if (currentStep === "join") return ["profile", "choice"];
     return ["profile", "choice", "create"];
   };
 
@@ -138,6 +142,86 @@ export default function SetupPage() {
       setIsSubmitting(false);
     }
   };
+
+  const handleJoinOrganization = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+    
+    const formData = new FormData(e.target as HTMLFormElement);
+    
+    try {
+      const inviteToken = formData.get("inviteToken") as string;
+      
+      if (!inviteToken?.trim()) {
+        throw new Error("Please enter a valid invitation token");
+      }
+      
+      await acceptInvitation({
+        inviteToken: inviteToken.trim(),
+      });
+      
+      // Get organization name for success message
+      setJoinedOrgData({
+        name: "Organization", // We'll show a generic success message
+      });
+      
+      // Show success for a moment then redirect
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 3000);
+    } catch (error: unknown) {
+      setError(getErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Success screen for joined organization
+  if (joinedOrgData) {
+    return (
+      <div className="grid min-h-screen lg:grid-cols-2">
+        <div className="flex flex-col gap-4 p-6 md:p-8">
+          <div className="flex justify-center gap-2 md:justify-start">
+            <Link href="/" className="flex items-center gap-2 font-semibold">
+              <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
+                <GalleryVerticalEnd className="size-4" />
+              </div>
+              PillFlow
+            </Link>
+          </div>
+          <div className="flex flex-1 items-center justify-center">
+            <div className="w-full max-w-md">
+              <Card>
+                <CardHeader className="text-center pb-4">
+                  <CardTitle className="text-xl text-green-600">🎉 Welcome!</CardTitle>
+                  <CardDescription>
+                    You have successfully joined the organization
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-center space-y-2">
+                    <div className="bg-green-50 border border-green-200 p-4 rounded-md">
+                      <p className="text-sm text-green-800 mb-2">
+                        <strong>Successfully joined organization!</strong>
+                      </p>
+                      <p className="text-sm text-green-700">
+                        You now have access to your organization&apos;s dashboard and can collaborate with your team.
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-center text-sm text-muted-foreground">
+                    Redirecting to dashboard in a few seconds...
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 relative hidden lg:block"></div>
+      </div>
+    );
+  }
 
   // Success screen for created organization
   if (createdOrgData) {
@@ -217,6 +301,7 @@ export default function SetupPage() {
                 {currentStep === "profile" && "Complete your professional profile"}
                 {currentStep === "choice" && "Set up your organization"}
                 {currentStep === "create" && "Create your organization"}
+                {currentStep === "join" && "Join existing organization"}
               </p>
             </div>
             
@@ -337,38 +422,57 @@ export default function SetupPage() {
               </Card>
             )}
 
-            {/* Step 2: Choice (simplified to only create organization) */}
+            {/* Step 2: Choice between create or join organization */}
             {currentStep === "choice" && (
               <Card>
                 <CardHeader className="text-center pb-4">
-                  <CardTitle className="text-lg">Create Your Organization</CardTitle>
+                  <CardTitle className="text-lg">Organization Setup</CardTitle>
                   <CardDescription className="text-sm">
-                    Set up your healthcare organization to get started
+                    Choose how you want to get started with PillFlow
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="text-center p-6 border-2 border-dashed border-muted-foreground/25 rounded-lg">
-                    <Building2 className="w-12 h-12 text-primary mx-auto mb-4" />
-                    <h3 className="font-semibold mb-2">Create Organization</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Set up a new healthcare organization and invite your team members.
-                    </p>
-                    <Button
-                      type="button"
-                      onClick={() => setCurrentStep("create")}
-                      className="w-full"
-                    >
-                      Get Started
-                    </Button>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Create Organization Option */}
+                    <div className="text-center p-6 border-2 border-dashed border-muted-foreground/25 rounded-lg hover:border-primary/50 transition-colors">
+                      <Building2 className="w-12 h-12 text-primary mx-auto mb-4" />
+                      <h3 className="font-semibold mb-2">Create Organization</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Set up a new healthcare organization and invite your team members.
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={() => setCurrentStep("create")}
+                        className="w-full"
+                      >
+                        Create Organization
+                      </Button>
+                    </div>
+
+                    {/* Join Organization Option */}
+                    <div className="text-center p-6 border-2 border-dashed border-muted-foreground/25 rounded-lg hover:border-primary/50 transition-colors">
+                      <Users className="w-12 h-12 text-primary mx-auto mb-4" />
+                      <h3 className="font-semibold mb-2">Join Organization</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Join an existing organization using an invitation token.
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={() => setCurrentStep("join")}
+                        variant="outline"
+                        className="w-full"
+                      >
+                        Join Organization
+                      </Button>
+                    </div>
                   </div>
                   
                   <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
                     <p className="text-sm text-blue-800">
-                      <strong>Looking to join an existing organization?</strong>
+                      <strong>💡 Don&apos;t have an invitation token?</strong>
                     </p>
                     <p className="text-sm text-blue-700 mt-1">
-                      Ask your organization administrator to send you an email invitation. 
-                      You&apos;ll receive a secure link to join their organization.
+                      Ask your organization administrator to send you an email invitation with a secure token to join their organization.
                     </p>
                   </div>
                 </CardContent>
@@ -552,6 +656,82 @@ export default function SetupPage() {
                         className="flex-1"
                       >
                         {isSubmitting ? "Creating..." : "Create Organization"}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Step 3: Join Organization */}
+            {currentStep === "join" && (
+              <Card>
+                <CardHeader className="text-center pb-4">
+                  <CardTitle className="text-lg">Join Organization</CardTitle>
+                  <CardDescription className="text-sm">
+                    Enter your invitation token to join an existing organization
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleJoinOrganization} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="inviteToken">Invitation Token *</Label>
+                      <Input 
+                        id="inviteToken"
+                        name="inviteToken"
+                        type="text"
+                        placeholder="e.g., ABCD-1234-EFGH-5678"
+                        required
+                        disabled={isSubmitting}
+                        className="font-mono"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Enter the invitation token from your organization administrator
+                      </p>
+                    </div>
+                    
+                    <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
+                      <p className="text-sm text-blue-800">
+                        <strong>🔐 How invitation tokens work:</strong>
+                      </p>
+                      <ul className="text-sm text-blue-700 mt-2 space-y-1">
+                        <li>• Tokens are sent via email by your organization administrator</li>
+                        <li>• They expire after 7 days for security</li>
+                        <li>• Each token can only be used once</li>
+                        <li>• Format: XXXX-XXXX-XXXX-XXXX</li>
+                      </ul>
+                    </div>
+                    
+                    {error && (
+                      <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
+                        <p className="font-medium">Error:</p>
+                        <p>{error}</p>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2">
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        onClick={() => setCurrentStep("choice")}
+                        disabled={isSubmitting}
+                        className="flex-1"
+                      >
+                        Back
+                      </Button>
+                      <Button 
+                        type="submit" 
+                        disabled={isSubmitting}
+                        className="flex-1"
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Joining...
+                          </>
+                        ) : (
+                          "Join Organization"
+                        )}
                       </Button>
                     </div>
                   </form>

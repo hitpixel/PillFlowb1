@@ -83,9 +83,19 @@ export const sendOrganizationInvite = internalMutation({
   },
   handler: async (ctx, args) => {
     try {
-      console.log("Sending organization invite email to:", args.inviteEmail);
+      console.log("🚀 Starting invitation email process...");
+      console.log("📧 Sending organization invite email to:", args.inviteEmail);
+      console.log("🏢 Organization:", args.organizationName);
+      console.log("👤 Inviter:", args.inviterName);
+      console.log("🎫 Token:", args.inviteToken);
       
-      const joinUrl = `${process.env.SITE_URL || 'http://localhost:3000'}/signin?invite=${args.inviteToken}`;
+      const siteUrl = process.env.SITE_URL || 'http://localhost:3000';
+      console.log("🌐 Site URL:", siteUrl);
+      
+      const joinUrl = `${siteUrl}/signin?invite=${args.inviteToken}`;
+      console.log("🔗 Join URL:", joinUrl);
+      
+      console.log("📤 Attempting to send email via Resend...");
       
       const emailId = await resend.sendEmail(
         ctx,
@@ -109,6 +119,8 @@ export const sendOrganizationInvite = internalMutation({
             </a>
           </p>
           
+          <p><strong>Your invitation token:</strong> <code style="background-color: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: monospace;">${args.inviteToken}</code></p>
+          
           <p><strong>Or copy and paste this link into your browser:</strong></p>
           <p style="background-color: #f1f5f9; padding: 10px; border-radius: 4px; font-family: monospace; word-break: break-all;">
             <a href="${joinUrl}">${joinUrl}</a>
@@ -130,6 +142,8 @@ GETTING STARTED:
 - If you already have an account: Sign in and you'll automatically join the organization
 - If you're new to PillFlow: Create your account and you'll be added to the organization immediately
 
+Your invitation token: ${args.inviteToken}
+
 Accept your invitation by visiting: ${joinUrl}
 
 ⏰ Important: This invitation will expire in 7 days. Please accept it soon to join the team!
@@ -138,10 +152,21 @@ Best regards,
 The PillFlow Team`
       );
       
-      console.log("Organization invite email queued successfully:", emailId);
+      console.log("✅ Organization invite email queued successfully! Email ID:", emailId);
+      console.log("📊 Email scheduled for delivery to:", args.inviteEmail);
       return emailId;
     } catch (error) {
-      console.error("Failed to send organization invite email:", error);
+      console.error("❌ FAILED to send organization invite email:");
+      console.error("📧 Email:", args.inviteEmail);
+      console.error("🏢 Organization:", args.organizationName);
+      console.error("🎫 Token:", args.inviteToken);
+      console.error("💥 Error details:", error);
+      
+      if (error instanceof Error) {
+        console.error("📝 Error message:", error.message);
+        console.error("📚 Error stack:", error.stack);
+      }
+      
       // Don't throw - we don't want email failures to break invitation creation
       return null;
     }
@@ -311,6 +336,83 @@ The PillFlow Team`
     } catch (error) {
       console.error("Failed to send test invitation email:", error);
       return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+    }
+  },
+}); 
+
+// Debug function to check email sending and Resend configuration
+export const debugEmailSystem = mutation({
+  args: {
+    testEmail: v.string(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      console.log("🔍 DEBUG: Email System Check");
+      console.log("📧 Test email:", args.testEmail);
+      
+      // Check environment variables
+      const siteUrl = process.env.SITE_URL;
+      const resendKey = process.env.RESEND_API_KEY;
+      
+      console.log("🌐 SITE_URL:", siteUrl || "NOT SET");
+      console.log("🔑 RESEND_API_KEY:", resendKey ? "SET (length: " + resendKey.length + ")" : "NOT SET");
+      
+      // Try to send a simple test email
+      console.log("📤 Testing basic email sending...");
+      const emailId = await resend.sendEmail(
+        ctx,
+        "PillFlow Debug <noreply@pillflow.com.au>",
+        args.testEmail,
+        "🔍 Debug: Email System Test",
+        `
+          <h1>Email System Debug Test</h1>
+          <p>This is a debug email to test the email system configuration.</p>
+          <h3>Configuration Check:</h3>
+          <ul>
+            <li>SITE_URL: ${siteUrl || "NOT SET"}</li>
+            <li>Resend API Key: ${resendKey ? "✅ Configured" : "❌ Not Set"}</li>
+            <li>Test Mode: ${process.env.NODE_ENV !== 'production' ? 'Development' : 'Production'}</li>
+            <li>Timestamp: ${new Date().toISOString()}</li>
+          </ul>
+          <p>If you received this email, the basic email system is working!</p>
+        `,
+        `Email System Debug Test
+
+This is a debug email to test the email system configuration.
+
+Configuration Check:
+- SITE_URL: ${siteUrl || "NOT SET"}
+- Resend API Key: ${resendKey ? "✅ Configured" : "❌ Not Set"}
+- Test Mode: ${process.env.NODE_ENV !== 'production' ? 'Development' : 'Production'}
+- Timestamp: ${new Date().toISOString()}
+
+If you received this email, the basic email system is working!`
+      );
+      
+      console.log("✅ Debug email sent successfully! Email ID:", emailId);
+      
+      return {
+        success: true,
+        emailId,
+        config: {
+          siteUrl: siteUrl || "NOT SET",
+          hasResendKey: !!resendKey,
+          resendKeyLength: resendKey?.length || 0,
+          timestamp: new Date().toISOString()
+        }
+      };
+    } catch (error) {
+      console.error("❌ Debug email failed:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+        config: {
+          siteUrl: process.env.SITE_URL || "NOT SET",
+          hasResendKey: !!process.env.RESEND_API_KEY,
+          resendKeyLength: process.env.RESEND_API_KEY?.length || 0,
+          timestamp: new Date().toISOString()
+        }
+      };
     }
   },
 }); 

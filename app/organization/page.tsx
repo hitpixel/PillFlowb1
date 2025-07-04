@@ -112,6 +112,7 @@ export default function OrganizationOverviewPage() {
   const inviteUser = useMutation(api.users.inviteUserToOrganization);
   const sendTestEmail = useMutation(api.emails.sendTestEmail);
   const sendTestInvitationEmail = useMutation(api.emails.sendTestInvitationEmail);
+  const debugEmailSystem = useMutation(api.emails.debugEmailSystem);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -234,6 +235,34 @@ export default function OrganizationOverviewPage() {
       setTimeout(() => setSuccess(null), 5000);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "Failed to send test invitation email";
+      setInviteError(errorMessage);
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const handleDebugEmail = async () => {
+    if (!inviteEmail.trim()) {
+      setInviteError("Please enter an email address to debug");
+      return;
+    }
+    
+    setIsInviting(true);
+    setInviteError(null);
+    
+    try {
+      const result = await debugEmailSystem({
+        testEmail: inviteEmail.trim(),
+      });
+      
+      if (result.success) {
+        setSuccess(`Debug email sent to ${inviteEmail}! Check console logs and your inbox.`);
+      } else {
+        setInviteError(`Debug email failed: ${result.error}`);
+      }
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send debug email";
       setInviteError(errorMessage);
     } finally {
       setIsInviting(false);
@@ -529,6 +558,15 @@ export default function OrganizationOverviewPage() {
                       className="px-4"
                     >
                       Test Invite
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      disabled={isInviting}
+                      onClick={handleDebugEmail}
+                      className="px-4"
+                    >
+                      Debug Email
                     </Button>
                   </div>
                 </form>
