@@ -1,8 +1,8 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,11 +20,22 @@ export function ConvexLoginForm({
 }: ConvexLoginFormProps) {
   const { signIn } = useAuthActions();
   const createUserProfile = useMutation(api.users.createUserProfile);
+  const acceptInvitation = useMutation(api.users.acceptInvitation);
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = searchParams.get('invite');
+    if (token) {
+      setInviteToken(token);
+      setFlow("signUp"); // Encourage signup for invited users
+    }
+  }, [searchParams]);
 
   const getErrorMessage = (error: unknown): string => {
     if (typeof error === 'string') {
@@ -98,15 +109,38 @@ export function ConvexLoginForm({
             lastName: formData.get("lastName") as string,
             email: formData.get("email") as string,
           });
+          
+          // If there's an invitation token, try to accept it
+          if (inviteToken) {
+            try {
+              await acceptInvitation({ inviteToken });
+              router.push("/dashboard"); // Go to dashboard if invitation accepted
+              return;
+            } catch (inviteError) {
+              console.error("Failed to accept invitation:", inviteError);
+              // Fall through to normal setup flow
+            }
+          }
         } catch (profileError) {
           // Log profile creation error but don't block the redirect
           console.error("Profile creation failed:", profileError);
           // The user authentication succeeded, so let them proceed to setup
         }
-        // Always redirect to setup after successful signup
+        // Always redirect to setup after successful signup (unless invitation was accepted)
         router.push("/setup");
       } else {
-        // Sign in - redirect to dashboard
+        // Sign in - check if there's an invitation token to accept
+        if (inviteToken) {
+          try {
+            await acceptInvitation({ inviteToken });
+            router.push("/dashboard");
+            return;
+          } catch (inviteError) {
+            console.error("Failed to accept invitation:", inviteError);
+            // Fall through to normal dashboard redirect
+          }
+        }
+        // Normal sign in - redirect to dashboard
         router.push("/dashboard");
       }
     } catch (error: unknown) {
@@ -121,16 +155,32 @@ export function ConvexLoginForm({
       <Card>
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">
-            {flow === "signIn" ? "Welcome back" : "Create your account"}
+            {inviteToken 
+              ? "Join Your Organization" 
+              : flow === "signIn" 
+                ? "Welcome back" 
+                : "Create your account"
+            }
           </CardTitle>
           <CardDescription>
-            {flow === "signIn" 
-              ? "Enter your email and password to sign in to your account" 
-              : "Enter your details to create a new account"
+            {inviteToken 
+              ? "You've been invited to join an organization. Create your account or sign in to accept the invitation."
+              : flow === "signIn" 
+                ? "Enter your email and password to sign in to your account" 
+                : "Enter your details to create a new account"
             }
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {inviteToken && (
+            <div className="mb-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+              <p className="text-sm text-blue-800">
+                <strong>✉️ Organization Invitation Active</strong><br />
+                You'll automatically join the organization after creating your account or signing in.
+              </p>
+            </div>
+          )}
+          
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             {flow === "signUp" && (
               <>

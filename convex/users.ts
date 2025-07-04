@@ -678,4 +678,202 @@ export const joinOrganization = mutation({
 
     return { organizationId: organization._id };
   },
+});
+
+// Invite user to organization
+export const inviteUserToOrganization = mutation({
+  args: {
+    email: v.string(),
+    role: v.union(v.literal("admin"), v.literal("member"), v.literal("viewer")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      throw new Error("User must be authenticated");
+    }
+
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .first();
+
+    if (!profile || !profile.organizationId) {
+      throw new Error("User must belong to an organization");
+    }
+
+    // Check if user has permission (owner or admin)
+    if (profile.role !== "owner" && profile.role !== "admin") {
+      throw new Error("Insufficient permissions to invite members");
+    }
+
+    // Check if user is already a member
+    const existingMember = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_email", q => q.eq("email", args.email))
+      .first();
+
+    if (existingMember && existingMember.organizationId) {
+      throw new Error("User is already a member of an organization");
+    }
+
+    // Check if there's already a pending invitation
+    const existingInvitation = await ctx.db
+      .query("memberInvitations")
+      .withIndex("by_email", q => q.eq("email", args.email))
+      .filter(q => q.eq(q.field("organizationId"), profile.organizationId))
+      .filter(q => q.eq(q.field("isUsed"), false))
+      .first();
+
+    if (existingInvitation && existingInvitation.expiresAt > Date.now()) {
+      throw new Error("An invitation has already been sent to this email");
+    }
+
+    // Get organization details
+    const organization = await ctx.db.get(profile.organizationId!);
+    if (!organization) {
+      throw new Error("Organization not found");
+    }
+
+    // Generate unique invitation token
+    let inviteToken: string;
+    let existing;
+    do {
+      inviteToken = generateInviteToken();
+      existing = await ctx.db
+        .query("memberInvitations")
+        .withIndex("by_invite_token", q => q.eq("inviteToken", inviteToken))
+        .first();
+    } while (existing);
+
+    // Create invitation (expires in 7 days)
+    const invitationId = await ctx.db.insert("memberInvitations", {
+      organizationId: profile.organizationId!,
+      email: args.email,
+      role: args.role,
+      inviteToken,
+      invitedBy: profile._id,
+      expiresAt: Date.now() + (7 * 24 * 60 * 60 * 1000), // 7 days
+      isUsed: false,
+      createdAt: Date.now(),
+      isActive: true,
+    });
+
+    // Send invitation email
+    try {
+      await ctx.scheduler.runAfter(0, internal.emails.sendOrganizationInvite, {
+        inviteEmail: args.email,
+        organizationName: organization.name,
+        inviterName: `${profile.firstName} ${profile.lastName}`,
+        inviteToken,
+      });
+    } catch (error) {
+      console.error("Failed to send invitation email:", error);
+      // Don't fail the invitation creation if email fails
+    }
+
+    return { invitationId, inviteToken };
+  },
+});
+
+// Accept organization invitation
+export const acceptInvitation = mutation({
+  args: {
+    inviteToken: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      throw new Error("User must be authenticated");
+    }
+
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .first();
+
+    if (!profile) {
+      throw new Error("User profile not found");
+    }
+
+    if (profile.organizationId) {
+      throw new Error("User already belongs to an organization");
+    }
+
+    // Find invitation
+    const invitation = await ctx.db
+      .query("memberInvitations")
+      .withIndex("by_invite_token", q => q.eq("inviteToken", args.inviteToken))
+      .first();
+
+    if (!invitation) {
+      throw new Error("Invalid invitation token");
+    }
+
+    if (invitation.isUsed) {
+      throw new Error("Invitation has already been used");
+    }
+
+    if (invitation.expiresAt < Date.now()) {
+      throw new Error("Invitation has expired");
+    }
+
+    if (invitation.email !== profile.email) {
+      throw new Error("Invitation email does not match user email");
+    }
+
+    // Accept invitation
+    await ctx.db.patch(profile._id, {
+      organizationId: invitation.organizationId,
+      role: invitation.role,
+      setupCompleted: true,
+    });
+
+    // Mark invitation as used
+    await ctx.db.patch(invitation._id, {
+      isUsed: true,
+      usedBy: profile._id,
+      usedAt: Date.now(),
+    });
+
+    return { organizationId: invitation.organizationId };
+  },
+});
+
+// Cancel/revoke invitation
+export const cancelInvitation = mutation({
+  args: {
+    invitationId: v.id("memberInvitations"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      throw new Error("User must be authenticated");
+    }
+
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .first();
+
+    if (!profile || !profile.organizationId) {
+      throw new Error("User must belong to an organization");
+    }
+
+    // Check if user has permission (owner or admin)
+    if (profile.role !== "owner" && profile.role !== "admin") {
+      throw new Error("Insufficient permissions to cancel invitations");
+    }
+
+    const invitation = await ctx.db.get(args.invitationId);
+    if (!invitation || invitation.organizationId !== profile.organizationId) {
+      throw new Error("Invitation not found");
+    }
+
+    // Cancel invitation by marking as inactive
+    await ctx.db.patch(args.invitationId, {
+      isActive: false,
+    });
+
+    return args.invitationId;
+  },
 }); 

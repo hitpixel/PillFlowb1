@@ -1,6 +1,6 @@
 "use client";
 
-import { useConvexAuth, useQuery } from "convex/react";
+import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/convex/_generated/api";
@@ -25,6 +25,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
@@ -102,6 +104,13 @@ export default function OrganizationOverviewPage() {
   
   // State
   const [success, setSuccess] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"admin" | "member" | "viewer">("member");
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  
+  // Mutations
+  const inviteUser = useMutation(api.users.inviteUserToOrganization);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -147,6 +156,35 @@ export default function OrganizationOverviewPage() {
     navigator.clipboard.writeText(text);
     setSuccess("Copied to clipboard!");
     setTimeout(() => setSuccess(null), 2000);
+  };
+
+  const handleInviteUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!inviteEmail.trim()) {
+      setInviteError("Please enter a valid email address");
+      return;
+    }
+    
+    setIsInviting(true);
+    setInviteError(null);
+    
+    try {
+      await inviteUser({
+        email: inviteEmail.trim(),
+        role: inviteRole,
+      });
+      
+      setSuccess(`Invitation sent to ${inviteEmail}!`);
+      setInviteEmail("");
+      setInviteRole("member");
+      setTimeout(() => setSuccess(null), 5000);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send invitation";
+      setInviteError(errorMessage);
+    } finally {
+      setIsInviting(false);
+    }
   };
 
   const canEdit = userProfile?.role === "owner" || userProfile?.role === "admin";
@@ -367,6 +405,78 @@ export default function OrganizationOverviewPage() {
               </p>
             </CardContent>
           </Card>
+
+          {/* Invite New Member */}
+          {canEdit && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Invite New Member</CardTitle>
+                <CardDescription>
+                  Send an invitation to add a new team member to your organization
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleInviteUser} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="inviteEmail">Email Address *</Label>
+                      <Input
+                        id="inviteEmail"
+                        type="email"
+                        placeholder="colleague@example.com"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        disabled={isInviting}
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="inviteRole">Role *</Label>
+                      <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as "admin" | "member" | "viewer")}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="viewer">Viewer - View only access</SelectItem>
+                          <SelectItem value="member">Member - Standard access</SelectItem>
+                          <SelectItem value="admin">Admin - Full management access</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  {inviteError && (
+                    <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
+                      <p className="font-medium">Error:</p>
+                      <p>{inviteError}</p>
+                    </div>
+                  )}
+                  
+                  <Button type="submit" disabled={isInviting} className="w-full md:w-auto">
+                    {isInviting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Sending Invitation...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Send Invitation
+                      </>
+                    )}
+                  </Button>
+                </form>
+                
+                <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+                  <p className="text-sm text-blue-800">
+                    <strong>Note:</strong> The invited user will receive an email with instructions to join your organization. 
+                    They can also create a new account using the invitation link if they don&apos;t have one.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Quick Actions */}

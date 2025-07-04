@@ -82,7 +82,7 @@ export const sendOrganizationInvite = internalMutation({
     inviteToken: v.string(),
   },
   handler: async (ctx, args) => {
-    const joinUrl = `${process.env.SITE_URL || 'http://localhost:3000'}/setup?invite=${args.inviteToken}`;
+    const joinUrl = `${process.env.SITE_URL || 'http://localhost:3000'}/signin?invite=${args.inviteToken}`;
     
     const emailId = await resend.sendEmail(
       ctx,
@@ -93,14 +93,28 @@ export const sendOrganizationInvite = internalMutation({
         <h1>You've been invited to join ${args.organizationName}</h1>
         <p>${args.inviterName} has invited you to join their organization on PillFlow.</p>
         <p>PillFlow is a healthcare medication management platform designed for medical professionals.</p>
-        <p>
-          <a href="${joinUrl}" style="background-color: #0066cc; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-            Accept Invitation
+        
+        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #334155;">Getting Started:</h3>
+          <p style="margin-bottom: 10px;"><strong>If you already have an account:</strong> Sign in and you'll automatically join the organization.</p>
+          <p style="margin-bottom: 0;"><strong>If you're new to PillFlow:</strong> Create your account and you'll be added to the organization immediately.</p>
+        </div>
+        
+        <p style="text-align: center; margin: 30px 0;">
+          <a href="${joinUrl}" style="background-color: #0066cc; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold;">
+            Accept Invitation & Join ${args.organizationName}
           </a>
         </p>
-        <p>Or copy and paste this link into your browser:</p>
-        <p><a href="${joinUrl}">${joinUrl}</a></p>
-        <p>This invitation will expire in 7 days.</p>
+        
+        <p><strong>Or copy and paste this link into your browser:</strong></p>
+        <p style="background-color: #f1f5f9; padding: 10px; border-radius: 4px; font-family: monospace; word-break: break-all;">
+          <a href="${joinUrl}">${joinUrl}</a>
+        </p>
+        
+        <div style="background-color: #fef3cd; border: 1px solid #fbbf24; border-radius: 6px; padding: 15px; margin: 20px 0;">
+          <p style="margin: 0; color: #92400e;"><strong>⏰ Important:</strong> This invitation will expire in 7 days. Please accept it soon to join the team!</p>
+        </div>
+        
         <p>Best regards,<br>The PillFlow Team</p>
       `,
       `You've been invited to join ${args.organizationName}
@@ -109,9 +123,13 @@ ${args.inviterName} has invited you to join their organization on PillFlow.
 
 PillFlow is a healthcare medication management platform designed for medical professionals.
 
+GETTING STARTED:
+- If you already have an account: Sign in and you'll automatically join the organization
+- If you're new to PillFlow: Create your account and you'll be added to the organization immediately
+
 Accept your invitation by visiting: ${joinUrl}
 
-This invitation will expire in 7 days.
+⏰ Important: This invitation will expire in 7 days. Please accept it soon to join the team!
 
 Best regards,
 The PillFlow Team`
