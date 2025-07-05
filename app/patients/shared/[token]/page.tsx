@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,6 @@ import {
 
 export default function SharedPatientPage() {
   const params = useParams();
-  const router = useRouter();
   const shareToken = decodeURIComponent(params.token as string);
   
   const patient = useQuery(api.patients.getPatientByShareToken, { shareToken });
