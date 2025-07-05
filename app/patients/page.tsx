@@ -25,6 +25,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { ShareTokenInput } from "@/components/ui/share-token-input";
 
 export default function PatientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -182,6 +183,9 @@ export default function PatientsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Share Token Access */}
+      <ShareTokenInput />
 
       {/* Patient List */}
       <Card>

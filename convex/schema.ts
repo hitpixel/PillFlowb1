@@ -154,5 +154,22 @@ export default defineSchema({
     .index("by_name", ["lastName", "firstName"])
     .index("by_created_by", ["createdBy"]),
 
+  // Audit log for share token access
+  shareTokenAccess: defineTable({
+    patientId: v.id("patients"),
+    accessedBy: v.id("userProfiles"),
+    accessedByOrg: v.id("organizations"),
+    patientOrg: v.id("organizations"),
+    shareToken: v.string(),
+    accessType: v.union(
+      v.literal("same_organization"),
+      v.literal("cross_organization")
+    ),
+    accessedAt: v.float64(),
+  })
+    .index("by_patient", ["patientId"])
+    .index("by_accessor", ["accessedBy"])
+    .index("by_share_token", ["shareToken"])
+    .index("by_access_time", ["accessedAt"]),
 
 });

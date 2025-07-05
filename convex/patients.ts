@@ -301,6 +301,16 @@ export const getPatientByShareToken = query({
       throw new Error("User not authenticated");
     }
 
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization to access patients");
+    }
+
     const patient = await ctx.db
       .query("patients")
       .withIndex("by_share_token", (q) => q.eq("shareToken", args.shareToken))
@@ -310,7 +320,23 @@ export const getPatientByShareToken = query({
       throw new Error("Patient not found or inactive");
     }
 
-    return patient;
+    // Get patient's organization for context
+    const patientOrg = await ctx.db.get(patient.organizationId);
+    
+    if (!patientOrg) {
+      throw new Error("Patient's organization not found");
+    }
+
+    // Users from the same organization can access without share token
+    // Users from different organizations need the share token
+    const isSameOrganization = patient.organizationId === userProfile.organizationId;
+    
+    return {
+      ...patient,
+      organizationName: patientOrg.name,
+      organizationType: patientOrg.type,
+      accessType: isSameOrganization ? "same_organization" : "cross_organization",
+    };
   },
 });
 
@@ -360,4 +386,50 @@ export const getPatientStats = query({
       },
     };
   },
-}); 
+});
+
+// Log access to a patient via share token (for audit purposes)
+export const logShareTokenAccess = mutation({
+  args: {
+    patientId: v.id("patients"),
+    shareToken: v.string(),
+    accessType: v.union(
+      v.literal("same_organization"),
+      v.literal("cross_organization")
+    ),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization");
+    }
+
+    const patient = await ctx.db.get(args.patientId);
+    if (!patient) {
+      throw new Error("Patient not found");
+    }
+
+    // Log the access
+    await ctx.db.insert("shareTokenAccess", {
+      patientId: args.patientId,
+      accessedBy: userProfile._id,
+      accessedByOrg: userProfile.organizationId,
+      patientOrg: patient.organizationId,
+      shareToken: args.shareToken,
+      accessType: args.accessType,
+      accessedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
