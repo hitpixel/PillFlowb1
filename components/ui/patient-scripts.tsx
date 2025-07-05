@@ -49,7 +49,8 @@ export function PatientScripts({ patientId }: PatientScriptsProps) {
   });
 
   // Mutations
-  const uploadScript = useMutation(api.patientManagement.uploadPatientScript);
+  const generateUploadUrl = useMutation(api.patientManagement.generateScriptUploadUrl);
+  const saveScript = useMutation(api.patientManagement.savePatientScript);
   const deleteScript = useMutation(api.patientManagement.deletePatientScript);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,19 +83,31 @@ export function PatientScripts({ patientId }: PatientScriptsProps) {
     try {
       setIsUploading(true);
 
-      // For now, we'll create a simple file URL using the file name
-      // In a production environment, you would use Convex file storage
-      const fileUrl = URL.createObjectURL(selectedFile);
-      const fileName = `${Date.now()}_${selectedFile.name}`;
-
-      // Save file metadata to database
-      await uploadScript({
+      // Step 1: Get upload URL from Convex
+      const uploadUrl = await generateUploadUrl({
         patientId: patientId as any,
-        fileName: fileName,
+      });
+
+      // Step 2: Upload file to Convex storage
+      const result = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": selectedFile.type },
+        body: selectedFile,
+      });
+
+      if (!result.ok) {
+        throw new Error("Failed to upload file to storage");
+      }
+
+      const { storageId } = await result.json();
+
+      // Step 3: Save file metadata to database
+      await saveScript({
+        patientId: patientId as any,
+        storageId: storageId,
         originalFileName: selectedFile.name,
         fileType: selectedFile.type as "application/pdf" | "image/png",
         fileSize: selectedFile.size,
-        fileUrl: fileUrl,
         description: description.trim() || undefined,
       });
 
@@ -127,10 +140,10 @@ export function PatientScripts({ patientId }: PatientScriptsProps) {
     }
   };
 
-  const handleDownload = async (fileUrl: string) => {
+  const handleDownload = async (downloadUrl: string) => {
     try {
       // Open file in new tab for viewing/downloading
-      window.open(fileUrl, '_blank');
+      window.open(downloadUrl, '_blank');
     } catch (error) {
       toast.error("Failed to open file");
       console.error(error);
@@ -333,7 +346,7 @@ export function PatientScripts({ patientId }: PatientScriptsProps) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDownload(script.fileUrl)}
+                      onClick={() => handleDownload(script.downloadUrl)}
                     >
                       <Download className="h-4 w-4 mr-1" />
                       View

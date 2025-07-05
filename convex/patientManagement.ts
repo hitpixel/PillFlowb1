@@ -1483,18 +1483,44 @@ async function logMedicationChange(ctx: any, params: {
 
 // SCRIPTS MANAGEMENT
 
-// Upload a script/document for a patient
-export const uploadPatientScript = mutation({
+// Generate upload URL for patient scripts
+export const generateScriptUploadUrl = mutation({
   args: {
     patientId: v.id("patients"),
-    fileName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) throw new Error("User profile not found");
+
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Unauthorized: No access to this patient");
+    }
+
+    // Generate upload URL
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+// Save script metadata after upload
+export const savePatientScript = mutation({
+  args: {
+    patientId: v.id("patients"),
+    storageId: v.id("_storage"),
     originalFileName: v.string(),
     fileType: v.union(
       v.literal("application/pdf"),
       v.literal("image/png")
     ),
     fileSize: v.number(),
-    fileUrl: v.string(),
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -1527,11 +1553,11 @@ export const uploadPatientScript = mutation({
 
     const scriptId = await ctx.db.insert("patientScripts", {
       patientId: args.patientId,
-      fileName: args.fileName,
+      fileName: args.storageId, // Use storage ID as the file name
       originalFileName: args.originalFileName,
       fileType: args.fileType,
       fileSize: args.fileSize,
-      fileUrl: args.fileUrl,
+      fileUrl: args.storageId, // Store storage ID as file URL
       uploadedBy: userProfile._id,
       uploadedByOrg: userProfile.organizationId!,
       uploadedAt: Date.now(),
@@ -1584,14 +1610,18 @@ export const getPatientScripts = query({
       .order("desc")
       .collect();
 
-    // Enrich with user and organization details
+    // Enrich with user, organization details, and file URLs
     const enrichedScripts = await Promise.all(
       scripts.map(async (script) => {
         const uploadedByUser = await ctx.db.get(script.uploadedBy);
         const uploadedByOrg = await ctx.db.get(script.uploadedByOrg);
+        
+        // Generate download URL using storage ID
+        const downloadUrl = await ctx.storage.getUrl(script.fileUrl as any);
 
         return {
           ...script,
+          downloadUrl,
           uploadedByUser: uploadedByUser ? {
             firstName: uploadedByUser.firstName,
             lastName: uploadedByUser.lastName,
@@ -1647,6 +1677,14 @@ export const deletePatientScript = mutation({
     await ctx.db.patch(args.scriptId, {
       isActive: false,
     });
+
+    // Delete the actual file from storage
+    try {
+      await ctx.storage.delete(script.fileUrl as any);
+    } catch (error) {
+      console.error("Failed to delete file from storage:", error);
+      // Continue with database update even if storage deletion fails
+    }
 
     // Add to communication log
     await ctx.db.insert("patientComments", {

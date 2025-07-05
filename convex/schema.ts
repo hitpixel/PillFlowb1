@@ -385,14 +385,14 @@ export default defineSchema({
   // Patient scripts/documents (PDF and PNG files)
   patientScripts: defineTable({
     patientId: v.id("patients"),
-    fileName: v.string(),
+    fileName: v.string(), // Storage ID for the file
     originalFileName: v.string(),
     fileType: v.union(
       v.literal("application/pdf"),
       v.literal("image/png")
     ),
     fileSize: v.number(), // in bytes
-    fileUrl: v.string(), // Convex file storage URL
+    fileUrl: v.string(), // Storage ID (same as fileName for consistency)
     uploadedBy: v.id("userProfiles"),
     uploadedByOrg: v.id("organizations"),
     uploadedAt: v.float64(),
