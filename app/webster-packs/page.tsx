@@ -485,101 +485,112 @@ export default function WebsterPacksPage() {
 
                         {patientMedications && (
                           <div className="space-y-4">
-                            {/* Morning Medications */}
-                            {patientMedications.medicationsByTime.morning.length > 0 && (
-                              <div className="border rounded-lg p-4">
+                            {/* Medications Grid - Side by Side */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                              {/* Morning Medications */}
+                              <div className="border rounded-lg p-4 h-fit">
                                 <h4 className="font-medium text-yellow-600 mb-3 flex items-center gap-2">
                                   <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                                  Morning ({patientMedications.medicationsByTime.morning.length} medications)
+                                  <span className="text-sm">Morning</span>
                                 </h4>
+                                <div className="text-xs text-gray-500 mb-2">
+                                  {patientMedications.medicationsByTime.morning.length} medications
+                                </div>
                                 <div className="space-y-2">
-                                  {patientMedications.medicationsByTime.morning.map((med, index) => (
-                                    <div key={index} className="flex items-center justify-between p-2 bg-yellow-50 rounded">
-                                      <div>
-                                        <div className="font-medium">{med.medicationName}</div>
-                                        <div className="text-sm text-gray-600">{med.dose}</div>
+                                  {patientMedications.medicationsByTime.morning.length > 0 ? (
+                                    patientMedications.medicationsByTime.morning.map((med, index) => (
+                                      <div key={index} className="p-2 bg-yellow-50 rounded text-sm">
+                                        <div className="font-medium text-gray-900">{med.medicationName}</div>
+                                        <div className="text-yellow-700 font-medium">{med.dose}</div>
+                                        {med.strength && (
+                                          <div className="text-xs text-gray-500">{med.strength}</div>
+                                        )}
                                       </div>
-                                      <div className="text-sm text-gray-500">
-                                        {med.strength && `${med.strength} • `}
-                                        {med.dosage}
-                                      </div>
-                                    </div>
-                                  ))}
+                                    ))
+                                  ) : (
+                                    <div className="text-xs text-gray-400 italic">No morning medications</div>
+                                  )}
                                 </div>
                               </div>
-                            )}
 
-                            {/* Afternoon Medications */}
-                            {patientMedications.medicationsByTime.afternoon.length > 0 && (
-                              <div className="border rounded-lg p-4">
+                              {/* Afternoon Medications */}
+                              <div className="border rounded-lg p-4 h-fit">
                                 <h4 className="font-medium text-orange-600 mb-3 flex items-center gap-2">
                                   <div className="w-3 h-3 bg-orange-400 rounded-full"></div>
-                                  Afternoon ({patientMedications.medicationsByTime.afternoon.length} medications)
+                                  <span className="text-sm">Afternoon</span>
                                 </h4>
+                                <div className="text-xs text-gray-500 mb-2">
+                                  {patientMedications.medicationsByTime.afternoon.length} medications
+                                </div>
                                 <div className="space-y-2">
-                                  {patientMedications.medicationsByTime.afternoon.map((med, index) => (
-                                    <div key={index} className="flex items-center justify-between p-2 bg-orange-50 rounded">
-                                      <div>
-                                        <div className="font-medium">{med.medicationName}</div>
-                                        <div className="text-sm text-gray-600">{med.dose}</div>
+                                  {patientMedications.medicationsByTime.afternoon.length > 0 ? (
+                                    patientMedications.medicationsByTime.afternoon.map((med, index) => (
+                                      <div key={index} className="p-2 bg-orange-50 rounded text-sm">
+                                        <div className="font-medium text-gray-900">{med.medicationName}</div>
+                                        <div className="text-orange-700 font-medium">{med.dose}</div>
+                                        {med.strength && (
+                                          <div className="text-xs text-gray-500">{med.strength}</div>
+                                        )}
                                       </div>
-                                      <div className="text-sm text-gray-500">
-                                        {med.strength && `${med.strength} • `}
-                                        {med.dosage}
-                                      </div>
-                                    </div>
-                                  ))}
+                                    ))
+                                  ) : (
+                                    <div className="text-xs text-gray-400 italic">No afternoon medications</div>
+                                  )}
                                 </div>
                               </div>
-                            )}
 
-                            {/* Evening Medications */}
-                            {patientMedications.medicationsByTime.evening.length > 0 && (
-                              <div className="border rounded-lg p-4">
+                              {/* Evening Medications */}
+                              <div className="border rounded-lg p-4 h-fit">
                                 <h4 className="font-medium text-purple-600 mb-3 flex items-center gap-2">
                                   <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
-                                  Evening ({patientMedications.medicationsByTime.evening.length} medications)
+                                  <span className="text-sm">Evening</span>
                                 </h4>
+                                <div className="text-xs text-gray-500 mb-2">
+                                  {patientMedications.medicationsByTime.evening.length} medications
+                                </div>
                                 <div className="space-y-2">
-                                  {patientMedications.medicationsByTime.evening.map((med, index) => (
-                                    <div key={index} className="flex items-center justify-between p-2 bg-purple-50 rounded">
-                                      <div>
-                                        <div className="font-medium">{med.medicationName}</div>
-                                        <div className="text-sm text-gray-600">{med.dose}</div>
+                                  {patientMedications.medicationsByTime.evening.length > 0 ? (
+                                    patientMedications.medicationsByTime.evening.map((med, index) => (
+                                      <div key={index} className="p-2 bg-purple-50 rounded text-sm">
+                                        <div className="font-medium text-gray-900">{med.medicationName}</div>
+                                        <div className="text-purple-700 font-medium">{med.dose}</div>
+                                        {med.strength && (
+                                          <div className="text-xs text-gray-500">{med.strength}</div>
+                                        )}
                                       </div>
-                                      <div className="text-sm text-gray-500">
-                                        {med.strength && `${med.strength} • `}
-                                        {med.dosage}
-                                      </div>
-                                    </div>
-                                  ))}
+                                    ))
+                                  ) : (
+                                    <div className="text-xs text-gray-400 italic">No evening medications</div>
+                                  )}
                                 </div>
                               </div>
-                            )}
 
-                            {/* Night Medications */}
-                            {patientMedications.medicationsByTime.night.length > 0 && (
-                              <div className="border rounded-lg p-4">
+                              {/* Night Medications */}
+                              <div className="border rounded-lg p-4 h-fit">
                                 <h4 className="font-medium text-indigo-600 mb-3 flex items-center gap-2">
                                   <div className="w-3 h-3 bg-indigo-400 rounded-full"></div>
-                                  Night ({patientMedications.medicationsByTime.night.length} medications)
+                                  <span className="text-sm">Night</span>
                                 </h4>
+                                <div className="text-xs text-gray-500 mb-2">
+                                  {patientMedications.medicationsByTime.night.length} medications
+                                </div>
                                 <div className="space-y-2">
-                                  {patientMedications.medicationsByTime.night.map((med, index) => (
-                                    <div key={index} className="flex items-center justify-between p-2 bg-indigo-50 rounded">
-                                      <div>
-                                        <div className="font-medium">{med.medicationName}</div>
-                                        <div className="text-sm text-gray-600">{med.dose}</div>
+                                  {patientMedications.medicationsByTime.night.length > 0 ? (
+                                    patientMedications.medicationsByTime.night.map((med, index) => (
+                                      <div key={index} className="p-2 bg-indigo-50 rounded text-sm">
+                                        <div className="font-medium text-gray-900">{med.medicationName}</div>
+                                        <div className="text-indigo-700 font-medium">{med.dose}</div>
+                                        {med.strength && (
+                                          <div className="text-xs text-gray-500">{med.strength}</div>
+                                        )}
                                       </div>
-                                      <div className="text-sm text-gray-500">
-                                        {med.strength && `${med.strength} • `}
-                                        {med.dosage}
-                                      </div>
-                                    </div>
-                                  ))}
+                                    ))
+                                  ) : (
+                                    <div className="text-xs text-gray-400 italic">No night medications</div>
+                                  )}
                                 </div>
                               </div>
-                            )}
+                            </div>
 
                             {/* Summary */}
                             <div className="bg-gray-50 p-4 rounded-lg">
