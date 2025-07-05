@@ -13,8 +13,7 @@ import {
   Shield,
   Crown,
   Eye,
-  ChevronLeft,
-  Mail
+  ChevronLeft
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -95,7 +94,6 @@ export default function OrganizationMembersPage() {
   const removeMember = useMutation(api.users.removeMember);
   const cancelInvitation = useMutation(api.users.cancelInvitation);
   const sendDirectInvitationEmail = useMutation(api.emails.sendInvitationEmailDirect);
-  const sendTestEmail = useMutation(api.emails.sendTestEmail);
   
   // State
   const [isSubmitting, setIsSubmitting] = useState(false);

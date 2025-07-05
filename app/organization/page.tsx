@@ -1,8 +1,8 @@
 "use client";
 
-import { useConvexAuth, useQuery, useMutation } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { api } from "@/convex/_generated/api";
 import { 
   Building2, 
@@ -17,16 +17,12 @@ import {
   Eye,
   Settings,
   UserPlus,
-  ExternalLink,
-  Copy
+  ExternalLink
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
@@ -340,7 +336,7 @@ export default function OrganizationOverviewPage() {
             <CardHeader>
               <CardTitle>Team Management</CardTitle>
               <CardDescription>
-                Manage your organization's team members
+                Manage your organization&apos;s team members
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
