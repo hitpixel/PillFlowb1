@@ -337,18 +337,18 @@ export function MedicationForm({
             </div>
 
             {/* Request Notes for Shared Users */}
-            {isSharedAccess && isEdit && (
+            {isSharedAccess && (
               <div className="space-y-2">
                 <Label htmlFor="requestNotes">Request Notes</Label>
                 <Textarea
                   id="requestNotes"
                   value={formData.requestNotes || ""}
                   onChange={(e) => handleInputChange("requestNotes", e.target.value)}
-                  placeholder="Please explain why you are requesting this change..."
+                  placeholder={isEdit ? "Please explain why you are requesting this change..." : "Please explain why you are requesting this medication addition..."}
                   rows={3}
                 />
                 <p className="text-sm text-muted-foreground">
-                  These notes will help the medication owner understand your change request
+                  These notes will help the medication owner understand your {isEdit ? "change" : "addition"} request
                 </p>
               </div>
             )}
@@ -479,7 +479,7 @@ export function MedicationForm({
               // Regular user actions - direct update/add
               <>
                 <Button type="submit" disabled={isLoading}>
-                  {isLoading ? "Saving..." : (isEdit ? "Update Medication" : "Add Medication")}
+                  {isLoading ? "Saving..." : (isEdit ? "Update Medication" : (isSharedAccess ? "Request Addition" : "Add Medication"))}
                 </Button>
                 <Button type="button" variant="outline" onClick={onCancel}>
                   Cancel

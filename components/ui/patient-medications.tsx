@@ -72,7 +72,11 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   const medications = useQuery(api.patientManagement.getPatientMedications, {
     patientId: patientId as any,
   });
+  const pendingRequests = useQuery(api.patientManagement.getPendingMedicationRequests, {
+    patientId: patientId as any,
+  });
   const currentUser = useQuery(api.users.getCurrentUserProfile);
+
 
   // Mutations
   const addMedication = useMutation(api.patientManagement.addPatientMedication);
@@ -80,10 +84,48 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   const requestMedicationChange = useMutation(api.patientManagement.requestMedicationChange);
   const approveMedicationRequest = useMutation(api.patientManagement.approveMedicationRequest);
   const rejectMedicationRequest = useMutation(api.patientManagement.rejectMedicationRequest);
+  const requestMedicationAddition = useMutation(api.patientManagement.requestMedicationAddition);
 
   const handleAddMedication = async (data: MedicationFormData) => {
-    try {
-      setIsSubmitting(true);
+  try {
+    setIsSubmitting(true);
+    
+    // Check if current user has shared access by looking at existing medications
+    // If there are medications from a different organization, this is shared access
+    const isSharedAccess = currentUser && medications && medications.length > 0 && 
+                           medications.some(med => med.organizationId !== currentUser.organizationId);
+    
+    if (isSharedAccess) {
+      // Request medication addition for shared users
+      await requestMedicationAddition({
+        patientId: patientId as any,
+        medicationName: data.medicationName,
+        dosage: data.dosage,
+        // Timing fields instead of frequency
+        morningDose: data.morningDose || undefined,
+        afternoonDose: data.afternoonDose || undefined,
+        eveningDose: data.eveningDose || undefined,
+        nightDose: data.nightDose || undefined,
+        instructions: data.instructions || undefined,
+        prescribedBy: data.prescribedBy || undefined,
+        prescribedDate: data.prescribedDate || undefined,
+        startDate: data.startDate || undefined,
+        endDate: data.endDate || undefined,
+        // FDA NDC fields
+        fdaNdc: data.fdaNdc || undefined,
+        genericName: data.genericName || undefined,
+        brandName: data.brandName || undefined,
+        dosageForm: data.dosageForm || undefined,
+        route: data.route || undefined,
+        manufacturer: data.manufacturer || undefined,
+        activeIngredient: data.activeIngredient || undefined,
+        strength: data.strength || undefined,
+        requestNotes: data.requestNotes || undefined,
+      });
+      
+      toast.success("Medication addition request submitted successfully");
+    } else {
+      // Add medication directly for users from the same organization
       await addMedication({
         patientId: patientId as any,
         medicationName: data.medicationName,
@@ -110,14 +152,16 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
       });
       
       toast.success("Medication added successfully");
-      setIsAddDialogOpen(false);
-    } catch (error) {
-      toast.error("Failed to add medication");
-      console.error(error);
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+    
+    setIsAddDialogOpen(false);
+  } catch (error) {
+    toast.error("Failed to add medication");
+    console.error(error);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const handleEditMedication = async (data: MedicationFormData) => {
     if (!editingMedication) return;
@@ -307,26 +351,151 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Medication
+                  {(() => {
+                    const isSharedAccess = currentUser && medications && medications.length > 0 && 
+                                           medications.some(med => med.organizationId !== currentUser.organizationId);
+                    return isSharedAccess ? "Request Medication Addition" : "Add Medication";
+                  })()}
                 </Button>
               </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Add New Medication</DialogTitle>
+                <DialogTitle>
+                  {(() => {
+                    const isSharedAccess = currentUser && medications && medications.length > 0 && 
+                                           medications.some(med => med.organizationId !== currentUser.organizationId);
+                    return isSharedAccess ? "Request Medication Addition" : "Add New Medication";
+                  })()}
+                </DialogTitle>
                 <DialogDescription>
-                  Add a new medication using FDA database search or manual entry
+                  {(() => {
+                    const isSharedAccess = currentUser && medications && medications.length > 0 && 
+                                           medications.some(med => med.organizationId !== currentUser.organizationId);
+                    return isSharedAccess 
+                      ? "Request to add a new medication - this will require approval from the patient's organization"
+                      : "Add a new medication using FDA database search or manual entry";
+                  })()}
                 </DialogDescription>
               </DialogHeader>
               <MedicationForm
                 onSubmit={handleAddMedication}
                 onCancel={() => setIsAddDialogOpen(false)}
                 isLoading={isSubmitting}
+                isSharedAccess={currentUser && medications && medications.length > 0 && 
+                               medications.some(med => med.organizationId !== currentUser.organizationId)}
               />
             </DialogContent>
           </Dialog>
           )}
         </div>
       </div>
+
+      {/* Pending Addition Requests */}
+      {pendingRequests && pendingRequests.filter((req: any) => req.requestType === "add").length > 0 && (
+        <div className="space-y-4">
+          <h4 className="text-md font-semibold text-orange-700">Pending Addition Requests</h4>
+          {pendingRequests
+            .filter((req: any) => req.requestType === "add")
+            .map((request: any) => (
+              <Card key={request._id} className="border-orange-200 bg-orange-50">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Pill className="h-5 w-5 text-orange-600" />
+                        <h4 className="text-lg font-semibold">{request.requestedChanges.medicationName}</h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-orange-100 text-orange-800">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Addition Requested
+                        </Badge>
+                        <Badge variant="outline">
+                          <Building2 className="h-3 w-3 mr-1" />
+                          {request.requestedByOrg?.name}
+                        </Badge>
+                      </div>
+                    </div>
+                    {currentUser && !isSharedAccess({ organizationId: request.requestedByOrg?._id }) && (
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={() => handleApproveRequest(request._id)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          Approve
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => handleRejectRequest(request._id)}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground mb-1">Dosage & Schedule</p>
+                      <p className="font-medium">{request.requestedChanges.dosage}</p>
+                      <div className="mt-2 space-y-1">
+                        {request.requestedChanges.morningDose && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Morning:</span>
+                            <span>{request.requestedChanges.morningDose}</span>
+                          </div>
+                        )}
+                        {request.requestedChanges.afternoonDose && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Afternoon:</span>
+                            <span>{request.requestedChanges.afternoonDose}</span>
+                          </div>
+                        )}
+                        {request.requestedChanges.eveningDose && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Evening:</span>
+                            <span>{request.requestedChanges.eveningDose}</span>
+                          </div>
+                        )}
+                        {request.requestedChanges.nightDose && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Night:</span>
+                            <span>{request.requestedChanges.nightDose}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {request.requestedChanges.instructions && (
+                      <div>
+                        <p className="text-muted-foreground mb-1">Instructions</p>
+                        <p className="text-sm">{request.requestedChanges.instructions}</p>
+                      </div>
+                    )}
+
+                    <div>
+                      <p className="text-muted-foreground mb-1">Requested by</p>
+                      <p className="text-sm">{request.requestedByUser?.firstName} {request.requestedByUser?.lastName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(request.requestedAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {request.requestNotes && (
+                    <div className="mt-4 p-3 bg-white rounded border border-orange-200">
+                      <p className="text-sm font-medium text-orange-700 mb-1">Request Notes:</p>
+                      <p className="text-sm">{request.requestNotes}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+        </div>
+      )}
 
       {/* Medications List */}
       {medications?.length === 0 ? (

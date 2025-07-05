@@ -23,7 +23,7 @@ interface MedicationLogProps {
 
 interface MedicationLogEntry {
   _id: Id<"medicationLogs">;
-  actionType: "added" | "updated" | "stopped" | "deleted" | "change_requested" | "change_approved" | "change_rejected" | "removal_requested" | "removal_approved" | "removal_rejected" | "request_canceled";
+  actionType: "added" | "updated" | "stopped" | "deleted" | "change_requested" | "change_approved" | "change_rejected" | "removal_requested" | "removal_approved" | "removal_rejected" | "request_canceled" | "addition_requested" | "addition_approved" | "addition_rejected";
   medicationName: string;
   performedAt: number;
   currentDosage?: string;
@@ -73,6 +73,9 @@ export function MedicationLog({ patientId }: MedicationLogProps) {
       case 'removal_approved': return <Trash2 className="h-4 w-4" />;
       case 'removal_rejected': return <Trash2 className="h-4 w-4" />;
       case 'request_canceled': return <Square className="h-4 w-4" />;
+      case 'addition_requested': return <Plus className="h-4 w-4" />;
+      case 'addition_approved': return <Plus className="h-4 w-4" />;
+      case 'addition_rejected': return <Plus className="h-4 w-4" />;
       default: return <Pill className="h-4 w-4" />;
     }
   };
@@ -90,6 +93,9 @@ export function MedicationLog({ patientId }: MedicationLogProps) {
       case 'removal_approved': return 'bg-green-100 text-green-800';
       case 'removal_rejected': return 'bg-red-100 text-red-800';
       case 'request_canceled': return 'bg-red-100 text-red-800';
+      case 'addition_requested': return 'bg-yellow-100 text-yellow-800';
+      case 'addition_approved': return 'bg-green-100 text-green-800';
+      case 'addition_rejected': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -107,6 +113,9 @@ export function MedicationLog({ patientId }: MedicationLogProps) {
       case 'removal_approved': return 'Removal Approved';
       case 'removal_rejected': return 'Removal Rejected';
       case 'request_canceled': return 'Request Canceled';
+      case 'addition_requested': return 'Addition Requested';
+      case 'addition_approved': return 'Addition Approved';
+      case 'addition_rejected': return 'Addition Rejected';
       default: return 'Changed';
     }
   };

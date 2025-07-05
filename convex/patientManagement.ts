@@ -975,17 +975,25 @@ export const approveMedicationRequest = mutation({
     const request = await ctx.db.get(args.requestId);
     if (!request) throw new Error("Request not found");
 
-    const medication = await ctx.db.get(request.medicationId);
-    if (!medication) throw new Error("Medication not found");
-
     // Check if user has access and is from the owning organization
     const hasAccess = await checkPatientAccess(ctx, request.patientId, userProfile._id);
     if (!hasAccess) {
       throw new Error("Unauthorized: No access to this patient");
     }
 
-    if (userProfile.organizationId !== medication.organizationId) {
+    // Get patient to check organization ownership
+    const patient = await ctx.db.get(request.patientId);
+    if (!patient) throw new Error("Patient not found");
+
+    if (userProfile.organizationId !== patient.organizationId) {
       throw new Error("Only users from the owning organization can approve requests");
+    }
+
+    // Get medication if it's an update/remove request
+    let medication = null;
+    if (request.medicationId) {
+      medication = await ctx.db.get(request.medicationId);
+      if (!medication) throw new Error("Medication not found");
     }
 
     if (request.status !== "pending") {
@@ -993,7 +1001,42 @@ export const approveMedicationRequest = mutation({
     }
 
     // Apply the changes
-    if (request.requestType === "update") {
+    let medicationId = request.medicationId;
+    let medicationName = medication?.medicationName || "";
+    
+    if (request.requestType === "add") {
+      // Create new medication for addition requests
+      const changes = request.requestedChanges;
+      medicationId = await ctx.db.insert("patientMedications", {
+        patientId: request.patientId,
+        organizationId: userProfile.organizationId!,
+        medicationName: changes.medicationName || "",
+        dosage: changes.dosage || "",
+        morningDose: changes.morningDose,
+        afternoonDose: changes.afternoonDose,
+        eveningDose: changes.eveningDose,
+        nightDose: changes.nightDose,
+        instructions: changes.instructions,
+        prescribedBy: changes.prescribedBy,
+        prescribedDate: changes.prescribedDate,
+        startDate: changes.startDate,
+        endDate: changes.endDate,
+        fdaNdc: changes.fdaNdc,
+        genericName: changes.genericName,
+        brandName: changes.brandName,
+        dosageForm: changes.dosageForm,
+        route: changes.route,
+        manufacturer: changes.manufacturer,
+        activeIngredient: changes.activeIngredient,
+        strength: changes.strength,
+        isActive: true,
+        addedBy: userProfile._id,
+        addedAt: Date.now(),
+      });
+      medicationName = changes.medicationName || "";
+    } else if (request.requestType === "update") {
+      if (!medication || !request.medicationId) throw new Error("Invalid update request");
+      
       const updates: any = {
         updatedBy: userProfile._id,
         updatedAt: Date.now(),
@@ -1023,6 +1066,8 @@ export const approveMedicationRequest = mutation({
 
       await ctx.db.patch(request.medicationId, updates);
     } else if (request.requestType === "remove") {
+      if (!medication || !request.medicationId) throw new Error("Invalid remove request");
+      
       // Mark medication as inactive
       await ctx.db.patch(request.medicationId, {
         isActive: false,
@@ -1040,24 +1085,26 @@ export const approveMedicationRequest = mutation({
     });
 
     // Log the approval
-    const actionType = request.requestType === "remove" ? "removal_approved" : "change_approved";
+    const actionType = request.requestType === "remove" ? "removal_approved" : 
+                      request.requestType === "add" ? "addition_approved" : "change_approved";
     await logMedicationChange(ctx, {
       patientId: request.patientId,
-      medicationId: request.medicationId,
+      medicationId: medicationId,
       actionType,
-      medicationName: medication.medicationName,
+      medicationName: medicationName,
       performedBy: userProfile._id,
       performedByOrg: userProfile.organizationId!,
       status: "approved",
     });
 
     // Add to communication log
-    const requestTypeText = request.requestType === "remove" ? "removal" : "change";
+    const requestTypeText = request.requestType === "remove" ? "removal" : 
+                           request.requestType === "add" ? "addition" : "change";
     await ctx.db.insert("patientComments", {
       patientId: request.patientId,
       authorId: userProfile._id,
       authorOrg: userProfile.organizationId!,
-      content: `Approved ${requestTypeText} for medication: ${medication.medicationName}${args.reviewNotes ? ` - ${args.reviewNotes}` : ''}`,
+      content: `Approved ${requestTypeText} for medication: ${medicationName}${args.reviewNotes ? ` - ${args.reviewNotes}` : ''}`,
       commentType: "system",
       isPrivate: false,
       isActive: true,
@@ -1088,17 +1135,29 @@ export const rejectMedicationRequest = mutation({
     const request = await ctx.db.get(args.requestId);
     if (!request) throw new Error("Request not found");
 
-    const medication = await ctx.db.get(request.medicationId);
-    if (!medication) throw new Error("Medication not found");
-
     // Check if user has access and is from the owning organization
     const hasAccess = await checkPatientAccess(ctx, request.patientId, userProfile._id);
     if (!hasAccess) {
       throw new Error("Unauthorized: No access to this patient");
     }
 
-    if (userProfile.organizationId !== medication.organizationId) {
+    // Get patient to check organization ownership
+    const patient = await ctx.db.get(request.patientId);
+    if (!patient) throw new Error("Patient not found");
+
+    if (userProfile.organizationId !== patient.organizationId) {
       throw new Error("Only users from the owning organization can reject requests");
+    }
+
+    // Get medication if it's an update/remove request
+    let medication = null;
+    let medicationName = "";
+    if (request.medicationId) {
+      medication = await ctx.db.get(request.medicationId);
+      if (!medication) throw new Error("Medication not found");
+      medicationName = medication.medicationName;
+    } else if (request.requestType === "add") {
+      medicationName = request.requestedChanges.medicationName || "";
     }
 
     if (request.status !== "pending") {
@@ -1114,24 +1173,26 @@ export const rejectMedicationRequest = mutation({
     });
 
     // Log the rejection
-    const actionType = request.requestType === "remove" ? "removal_rejected" : "change_rejected";
+    const actionType = request.requestType === "remove" ? "removal_rejected" : 
+                      request.requestType === "add" ? "addition_rejected" : "change_rejected";
     await logMedicationChange(ctx, {
       patientId: request.patientId,
-      medicationId: request.medicationId,
+      medicationId: request.medicationId || undefined,
       actionType,
-      medicationName: medication.medicationName,
+      medicationName: medicationName,
       performedBy: userProfile._id,
       performedByOrg: userProfile.organizationId!,
       status: "rejected",
     });
 
     // Add to communication log
-    const requestTypeText = request.requestType === "remove" ? "removal" : "change";
+    const requestTypeText = request.requestType === "remove" ? "removal" : 
+                           request.requestType === "add" ? "addition" : "change";
     await ctx.db.insert("patientComments", {
       patientId: request.patientId,
       authorId: userProfile._id,
       authorOrg: userProfile.organizationId!,
-      content: `Rejected ${requestTypeText} for medication: ${medication.medicationName}${args.reviewNotes ? ` - ${args.reviewNotes}` : ''}`,
+      content: `Rejected ${requestTypeText} for medication: ${medicationName}${args.reviewNotes ? ` - ${args.reviewNotes}` : ''}`,
       commentType: "system",
       isPrivate: false,
       isActive: true,
@@ -1176,7 +1237,12 @@ export const getPendingMedicationRequests = query({
       requests.map(async (request) => {
         const requestedByUser = await ctx.db.get(request.requestedBy);
         const requestedByOrg = await ctx.db.get(request.requestedByOrg);
-        const medication = await ctx.db.get(request.medicationId);
+        
+        // For addition requests, medicationId will be null/undefined
+        let medication = null;
+        if (request.medicationId) {
+          medication = await ctx.db.get(request.medicationId);
+        }
 
         return {
           ...request,
@@ -1191,12 +1257,139 @@ export const getPendingMedicationRequests = query({
           medication: medication ? {
             medicationName: medication.medicationName,
             dosage: medication.dosage,
+          } : request.requestType === "add" ? {
+            medicationName: request.requestedChanges.medicationName || "",
+            dosage: request.requestedChanges.dosage || "",
           } : null,
         };
       })
     );
 
     return enrichedRequests;
+  },
+});
+
+// Request medication addition (for shared users)
+export const requestMedicationAddition = mutation({
+  args: {
+    patientId: v.id("patients"),
+    medicationName: v.string(),
+    dosage: v.string(),
+    // Timing fields instead of frequency
+    morningDose: v.optional(v.string()),
+    afternoonDose: v.optional(v.string()),
+    eveningDose: v.optional(v.string()),
+    nightDose: v.optional(v.string()),
+    instructions: v.optional(v.string()),
+    prescribedBy: v.optional(v.string()),
+    prescribedDate: v.optional(v.string()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+    // FDA NDC fields
+    fdaNdc: v.optional(v.string()),
+    genericName: v.optional(v.string()),
+    brandName: v.optional(v.string()),
+    dosageForm: v.optional(v.string()),
+    route: v.optional(v.string()),
+    manufacturer: v.optional(v.string()),
+    activeIngredient: v.optional(v.string()),
+    strength: v.optional(v.string()),
+    requestNotes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) throw new Error("User profile not found");
+
+    const patient = await ctx.db.get(args.patientId);
+    if (!patient) throw new Error("Patient not found");
+
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Unauthorized: No access to this patient");
+    }
+
+    // Check if user is from a different organization (shared access)
+    const isSharedAccess = userProfile.organizationId !== patient.organizationId;
+    if (!isSharedAccess) {
+      throw new Error("Only users from other organizations can request medication additions");
+    }
+
+    // Store the requested medication data
+    const requestedMedication = {
+      medicationName: args.medicationName,
+      dosage: args.dosage,
+      morningDose: args.morningDose,
+      afternoonDose: args.afternoonDose,
+      eveningDose: args.eveningDose,
+      nightDose: args.nightDose,
+      instructions: args.instructions,
+      prescribedBy: args.prescribedBy,
+      prescribedDate: args.prescribedDate,
+      startDate: args.startDate,
+      endDate: args.endDate,
+      fdaNdc: args.fdaNdc,
+      genericName: args.genericName,
+      brandName: args.brandName,
+      dosageForm: args.dosageForm,
+      route: args.route,
+      manufacturer: args.manufacturer,
+      activeIngredient: args.activeIngredient,
+      strength: args.strength,
+    };
+
+    // Create the addition request
+    const requestId = await ctx.db.insert("medicationChangeRequests", {
+      patientId: args.patientId,
+      medicationId: undefined, // No existing medication ID for additions
+      requestType: "add",
+      requestedChanges: requestedMedication,
+      requestNotes: args.requestNotes,
+      requestedBy: userProfile._id,
+      requestedByOrg: userProfile.organizationId!,
+      requestedAt: Date.now(),
+      status: "pending",
+      originalState: undefined, // No original state for additions
+    });
+
+    // Log the request
+    await logMedicationChange(ctx, {
+      patientId: args.patientId,
+      medicationId: undefined,
+      actionType: "addition_requested",
+      medicationName: args.medicationName,
+      performedBy: userProfile._id,
+      performedByOrg: userProfile.organizationId!,
+      requestNotes: args.requestNotes,
+      status: "pending",
+      currentDosage: args.dosage,
+      currentMorningDose: args.morningDose,
+      currentAfternoonDose: args.afternoonDose,
+      currentEveningDose: args.eveningDose,
+      currentNightDose: args.nightDose,
+      currentInstructions: args.instructions,
+    });
+
+    // Add to communication log
+    await ctx.db.insert("patientComments", {
+      patientId: args.patientId,
+      authorId: userProfile._id,
+      authorOrg: userProfile.organizationId!,
+      content: `Requested addition of medication: ${args.medicationName}${args.requestNotes ? ` - ${args.requestNotes}` : ''}`,
+      commentType: "system",
+      isPrivate: false,
+      isActive: true,
+      createdAt: Date.now(),
+    });
+
+    return requestId;
   },
 });
 
@@ -1244,7 +1437,7 @@ async function checkPatientAccess(ctx: any, patientId: any, userProfileId: any) 
 async function logMedicationChange(ctx: any, params: {
   patientId: any;
   medicationId?: any;
-  actionType: "added" | "updated" | "stopped" | "deleted" | "change_requested" | "change_approved" | "change_rejected" | "removal_requested" | "removal_approved" | "removal_rejected" | "request_canceled";
+  actionType: "added" | "updated" | "stopped" | "deleted" | "change_requested" | "change_approved" | "change_rejected" | "removal_requested" | "removal_approved" | "removal_rejected" | "request_canceled" | "addition_requested" | "addition_approved" | "addition_rejected";
   medicationName: string;
   performedBy: any;
   performedByOrg: any;
@@ -1261,7 +1454,7 @@ async function logMedicationChange(ctx: any, params: {
 }) {
   await ctx.db.insert("medicationLogs", {
     patientId: params.patientId,
-    medicationId: params.medicationId,
+    medicationId: params.medicationId || undefined,
     actionType: params.actionType,
     medicationName: params.medicationName,
     changes: params.changes,

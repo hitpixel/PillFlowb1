@@ -261,7 +261,10 @@ export default defineSchema({
       v.literal("removal_requested"),
       v.literal("removal_approved"),
       v.literal("removal_rejected"),
-      v.literal("request_canceled")
+      v.literal("request_canceled"),
+      v.literal("addition_requested"),
+      v.literal("addition_approved"),
+      v.literal("addition_rejected")
     ),
     medicationName: v.string(),
     changes: v.optional(v.string()), // JSON string of changes made
@@ -296,10 +299,11 @@ export default defineSchema({
   // Pending medication change requests
   medicationChangeRequests: defineTable({
     patientId: v.id("patients"),
-    medicationId: v.id("patientMedications"),
+    medicationId: v.optional(v.id("patientMedications")), // null for addition requests
     requestType: v.union(
       v.literal("update"),
-      v.literal("remove")
+      v.literal("remove"),
+      v.literal("add")
     ),
     // Requested changes
     requestedChanges: v.object({
@@ -335,7 +339,7 @@ export default defineSchema({
       v.literal("canceled")
     ),
     // Original state for comparison
-    originalState: v.string(), // JSON string of original medication state
+    originalState: v.optional(v.string()), // JSON string of original medication state, null for additions
     // Approval/rejection
     reviewedBy: v.optional(v.id("userProfiles")),
     reviewedAt: v.optional(v.float64()),
