@@ -425,4 +425,40 @@ export default defineSchema({
     .index("by_added_at", ["addedAt"])
     .index("by_active", ["isActive"]),
 
+  // Webster pack checks for quality control
+  websterPackChecks: defineTable({
+    patientId: v.id("patients"),
+    websterPackId: v.string(), // Webster pack identifier/barcode
+    packType: v.union(
+      v.literal("blister"),
+      v.literal("sachets")
+    ),
+    checkStatus: v.union(
+      v.literal("passed"),
+      v.literal("failed"),
+      v.literal("requires_review")
+    ),
+    notes: v.optional(v.string()), // Quality check notes
+    issues: v.optional(v.array(v.string())), // List of identified issues
+    checkedBy: v.id("userProfiles"),
+    checkedByOrg: v.id("organizations"),
+    checkedAt: v.float64(),
+    // Patient details at time of check (for historical record)
+    patientName: v.string(),
+    patientPreferredPack: v.string(),
+    // Verification details
+    medicationCount: v.optional(v.number()), // Number of medications in pack
+    packWeight: v.optional(v.number()), // Pack weight if measured
+    batchNumber: v.optional(v.string()), // Manufacturing batch number
+    expiryDate: v.optional(v.string()), // Earliest expiry date in pack
+    isActive: v.boolean(),
+  })
+    .index("by_patient", ["patientId"])
+    .index("by_webster_pack_id", ["websterPackId"])
+    .index("by_pack_type", ["packType"])
+    .index("by_check_status", ["checkStatus"])
+    .index("by_checked_by", ["checkedBy"])
+    .index("by_checked_at", ["checkedAt"])
+    .index("by_active", ["isActive"]),
+
 });

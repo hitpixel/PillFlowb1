@@ -15,6 +15,7 @@ import type * as http from "../http.js";
 import type * as patientManagement from "../patientManagement.js";
 import type * as patients from "../patients.js";
 import type * as users from "../users.js";
+import type * as websterPacks from "../websterPacks.js";
 
 import type {
   ApiFromModules,
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   patientManagement: typeof patientManagement;
   patients: typeof patients;
   users: typeof users;
+  websterPacks: typeof websterPacks;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

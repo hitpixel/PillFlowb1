@@ -179,6 +179,22 @@ export default function HomePage() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Webster Pack Checking - Only for Pharmacies */}
+                  {organization.type === "pharmacy" && (
+                    <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <div>
+                        <p className="font-medium text-green-800">
+                          <Shield className="h-3 w-3 inline mr-1" />
+                          Webster Pack Checking
+                        </p>
+                        <p className="text-xs text-green-600">
+                          Quality control & verification
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 {organization.type !== "pharmacy" && (
@@ -264,6 +280,12 @@ export default function HomePage() {
                   <Button variant="outline" className="w-full justify-start">
                     <Plus className="mr-2 h-4 w-4" />
                     Add New Patient
+                  </Button>
+                )}
+                {organization?.type === "pharmacy" && (
+                  <Button variant="outline" className="w-full justify-start">
+                    <Shield className="mr-2 h-4 w-4" />
+                    Check Webster Pack
                   </Button>
                 )}
                 <Button variant="outline" className="w-full justify-start">

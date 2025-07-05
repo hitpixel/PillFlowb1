@@ -118,6 +118,28 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
     ],
   };
 
+  // Webster pack checking section - only for pharmacies
+  const websterPackSection = {
+    title: "Webster Packs",
+    url: "/webster-packs",
+    icon: Shield,
+    isActive: false,
+    items: [
+      {
+        title: "Pack Checking",
+        url: "/webster-packs",
+      },
+      {
+        title: "Quality Reports",
+        url: "/webster-packs/reports",
+      },
+      {
+        title: "Pack History",
+        url: "/webster-packs/history",
+      },
+    ],
+  };
+
   // Common sections for all organization types
   const commonSections = [
     {
@@ -196,9 +218,10 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
   // Add patients section
   navMain.push(getPatientsSection());
   
-  // Only add medications section for pharmacy organizations
+  // Only add pharmacy-specific sections for pharmacy organizations
   if (organizationType === "pharmacy") {
     navMain.push(medicationsSection);
+    navMain.push(websterPackSection);
   }
   
   navMain.push(...commonSections);
