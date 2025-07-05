@@ -115,12 +115,26 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Core Features - Available to all */}
-                  <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg border border-green-200">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
+                  {/* Patient Management - Different access levels */}
+                  <div className={`flex items-center gap-2 p-3 rounded-lg border ${
+                    organization.type === "pharmacy" 
+                      ? "bg-green-50 border-green-200" 
+                      : "bg-blue-50 border-blue-200"
+                  }`}>
+                    <CheckCircle className={`h-4 w-4 ${
+                      organization.type === "pharmacy" ? "text-green-600" : "text-blue-600"
+                    }`} />
                     <div>
-                      <p className="font-medium text-green-800">Patient Management</p>
-                      <p className="text-xs text-green-600">Full access</p>
+                      <p className={`font-medium ${
+                        organization.type === "pharmacy" ? "text-green-800" : "text-blue-800"
+                      }`}>
+                        Patient Management
+                      </p>
+                      <p className={`text-xs ${
+                        organization.type === "pharmacy" ? "text-green-600" : "text-blue-600"
+                      }`}>
+                        {organization.type === "pharmacy" ? "Full access" : "View & access only"}
+                      </p>
                     </div>
                   </div>
                   
@@ -170,9 +184,9 @@ export default function HomePage() {
                 {organization.type !== "pharmacy" && (
                   <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                     <p className="text-sm text-blue-800">
-                      <strong>ℹ️ Note:</strong> Medication management features are designed specifically for pharmacy operations. 
-                      Your {organization.type.replace("_", " ")} organization has access to all other PillFlow features 
-                      including patient care, compliance tracking, and team collaboration tools.
+                      <strong>ℹ️ Note:</strong> As a {organization.type.replace("_", " ")} organization, you have access to view and manage patients 
+                      but cannot create new patient records. Patient creation and medication management features are designed specifically for pharmacy operations. 
+                      You can access all other PillFlow features including patient care, compliance tracking, and team collaboration tools.
                     </p>
                   </div>
                 )}
@@ -246,10 +260,12 @@ export default function HomePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add New Patient
-                </Button>
+                {organization?.type === "pharmacy" && (
+                  <Button variant="outline" className="w-full justify-start">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add New Patient
+                  </Button>
+                )}
                 <Button variant="outline" className="w-full justify-start">
                   <Activity className="mr-2 h-4 w-4" />
                   Record Medication

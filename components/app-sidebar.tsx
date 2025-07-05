@@ -53,36 +53,51 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
         },
       ],
     },
-    {
+  ];
+
+  // Patients section - with conditional Add Patient for pharmacies only
+  const getPatientsSection = () => {
+    const patientsItems = [
+      {
+        title: "All Patients",
+        url: "/patients",
+      },
+    ];
+
+    // Only add "Add Patient" for pharmacy organizations
+    if (organizationType === "pharmacy") {
+      patientsItems.push({
+        title: "Add Patient",
+        url: "/patients/new",
+      });
+    }
+
+    patientsItems.push(
+      {
+        title: "Patient Groups",
+        url: "/patients/groups",
+      },
+      {
+        title: "Assessments",
+        url: "/patients/assessments",
+      }
+    );
+
+    return {
       title: "Patients",
       url: "/patients",
       icon: Users,
-      items: [
-        {
-          title: "All Patients",
-          url: "/patients",
-        },
-        {
-          title: "Add Patient",
-          url: "/patients/new",
-        },
-        {
-          title: "Patient Groups",
-          url: "/patients/groups",
-        },
-        {
-          title: "Assessments",
-          url: "/patients/assessments",
-        },
-      ],
-    },
-  ];
+      isActive: false,
+      items: patientsItems,
+    };
+  };
 
   // Medications section - only for pharmacies
   const medicationsSection = {
     title: "Medications",
     url: "/medications",
     icon: Pill,
+    isActive: false,
     items: [
       {
         title: "Active Medications",
@@ -109,6 +124,7 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
       title: "Compliance",
       url: "/compliance",
       icon: Activity,
+      isActive: false,
       items: [
         {
           title: "Adherence Tracking",
@@ -128,6 +144,7 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
       title: "Organization",
       url: "#",
       icon: Building2,
+      isActive: false,
       items: [
         {
           title: "Overview",
@@ -151,6 +168,7 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
       title: "Settings",
       url: "/settings",
       icon: Settings,
+      isActive: false,
       items: [
         {
           title: "Profile",
@@ -174,6 +192,9 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
 
   // Build navigation array based on organization type
   const navMain = [...baseNavItems];
+  
+  // Add patients section
+  navMain.push(getPatientsSection());
   
   // Only add medications section for pharmacy organizations
   if (organizationType === "pharmacy") {

@@ -6,9 +6,19 @@ import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Search, Users, Calendar, Package, Grid, List } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Search, 
+  Plus, 
+  Users, 
+  Grid, 
+  List,
+  Building2
+} from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
+import { PatientCard } from "@/components/ui/patient-card";
+import { PatientList } from "@/components/ui/patient-list";
+import { ShareTokenModal } from "@/components/ui/share-token-modal";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
@@ -24,43 +34,48 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { ShareTokenModal } from "@/components/ui/share-token-modal";
-import { PatientCard } from "@/components/ui/patient-card";
-import { PatientList } from "@/components/ui/patient-list";
+import { toast } from "sonner";
 
 export default function PatientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
+
+  const patients = useQuery(api.patients.getPatients, {
+    limit: 50,
+    offset: 0,
+  });
   
-  // Get all patients or search results
-  const allPatients = useQuery(api.patients.getPatients, {});
   const searchResults = useQuery(
     api.patients.searchPatients,
-    searchTerm.trim().length > 0 ? { searchTerm: searchTerm.trim() } : "skip"
+    isSearching && searchTerm.trim() ? { searchTerm: searchTerm.trim() } : "skip"
   );
-  
-  // Get patient statistics
-  const patientStats = useQuery(api.patients.getPatientStats, {});
-  
-  const patients = searchTerm.trim().length > 0 ? searchResults : allPatients;
+
+  // Get organization to check type
+  const organization = useQuery(api.users.getOrganization);
+
   const isLoading = patients === undefined;
+  const displayPatients = isSearching && searchResults ? searchResults : patients;
 
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     setIsSearching(value.trim().length > 0);
   };
 
-
+  // Check if current organization can add patients (only pharmacies)
+  const canAddPatients = organization?.type === "pharmacy";
 
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-[orientation=vertical]:h-4"
+            />
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
@@ -76,6 +91,7 @@ export default function PatientsPage() {
             </Breadcrumb>
           </div>
         </header>
+        
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           <div className="max-w-6xl mx-auto space-y-6 w-full">
             {/* Header */}
@@ -84,65 +100,80 @@ export default function PatientsPage() {
                 <div>
                   <h1 className="text-3xl font-bold">Patients</h1>
                   <p className="text-muted-foreground">
-                    Manage your organization&apos;s patient records
+                    {canAddPatients ? "Manage your organization's patient records" : "View and manage patient records"}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <ShareTokenModal />
-                  <Link href="/patients/new">
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Patient
-                    </Button>
-                  </Link>
+                  {canAddPatients && (
+                    <Link href="/patients/new">
+                      <Button>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Patient
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </div>
+              
+              {/* Organization type notice for non-pharmacy organizations */}
+              {!canAddPatients && organization && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-blue-600" />
+                    <p className="text-sm text-blue-800">
+                      <strong>Note:</strong> As a {organization.type.replace("_", " ")} organization, 
+                      you can view and access patients but cannot create new patient records. 
+                      Patient creation is managed by pharmacy organizations.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
       {/* Statistics Cards */}
-      {patientStats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{patientStats.totalPatients}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">This Month</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{patientStats.patientsThisMonth}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Blister Packs</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{patientStats.packingPreferences.blister}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Sachets</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{patientStats.packingPreferences.sachets}</div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Patients</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{patients?.length || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              {patients?.length === 1 ? "patient" : "patients"} in your organization
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Shared Patients</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+                         <div className="text-2xl font-bold">
+               {patients?.filter((p) => p.isShared).length || 0}
+             </div>
+            <p className="text-xs text-muted-foreground">
+              patients shared from other organizations
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
+            <Badge variant="outline">Coming Soon</Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">--</div>
+            <p className="text-xs text-muted-foreground">
+              patient interactions this week
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Search and View Controls */}
       <Card>
@@ -200,7 +231,7 @@ export default function PatientsPage() {
       ) : patients && patients.length > 0 ? (
         viewMode === "cards" ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {patients.map((patient) => (
+            {displayPatients?.map((patient) => (
               <PatientCard
                 key={patient._id}
                 patient={patient}
@@ -212,7 +243,7 @@ export default function PatientsPage() {
           </div>
         ) : (
           <PatientList
-            patients={patients}
+            patients={displayPatients || []}
             onCopyShareToken={() => {
               toast.success("Share token copied to clipboard");
             }}
@@ -228,9 +259,11 @@ export default function PatientsPage() {
             <p className="text-muted-foreground mb-4">
               {isSearching
                 ? "Try adjusting your search terms"
-                : "Get started by adding your first patient"}
+                : canAddPatients
+                ? "Get started by adding your first patient"
+                : "No patients are currently accessible to your organization"}
             </p>
-            {!isSearching && (
+            {!isSearching && canAddPatients && (
               <Link href="/patients/new">
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
