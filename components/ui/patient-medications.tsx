@@ -68,9 +68,12 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   const [editingMedication, setEditingMedication] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Query for medications and current user
+  // Query for medications, patient, and current user
   const medications = useQuery(api.patientManagement.getPatientMedications, {
     patientId: patientId as any,
+  });
+  const patient = useQuery(api.patients.getPatient, {
+    id: patientId as any,
   });
   const currentUser = useQuery(api.users.getCurrentUserProfile);
 
@@ -297,6 +300,12 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
     return currentUser.organizationId !== medication.organizationId;
   };
 
+  // Check if current user is from the patient's organization (can approve/reject requests)
+  const isPatientOrganizationUser = () => {
+    if (!currentUser || !patient?.patient?.organizationId) return false;
+    return currentUser.organizationId === patient.patient.organizationId;
+  };
+
   const isMedicationActive = (medication: any) => {
     if (medication.isPendingAddition) {
       return true; // Pending additions should be considered "active" for display purposes
@@ -512,8 +521,8 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                         )}
                       </>
                     )}
-                    {((medication.hasPendingRequest && medication.pendingRequest && !isSharedAccess(medication)) || 
-                      (medication.isPendingAddition && !isSharedAccess(medication))) && (
+                    {((medication.hasPendingRequest && medication.pendingRequest) || medication.isPendingAddition) && 
+                     isPatientOrganizationUser() && (
                       <div className="flex items-center gap-2">
                         <Button 
                           variant="default" 
