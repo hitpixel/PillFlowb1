@@ -320,9 +320,20 @@ export default function PatientDetailPage() {
                     <h1 className="text-3xl font-bold flex items-center gap-2">
                       <User className="h-8 w-8" />
                       {patient.firstName} {patient.lastName}
+                      {patient.isShared && (
+                        <Badge variant="outline" className="ml-2">
+                          <Share2 className="h-3 w-3 mr-1" />
+                          Shared Patient
+                        </Badge>
+                      )}
                     </h1>
                     <p className="text-muted-foreground">
                       Patient details and medical information
+                      {patient.isShared && patient.organizationName && (
+                        <span className="block text-sm text-blue-600">
+                          From: {patient.organizationName} ({patient.organizationType?.replace('_', ' ')})
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -330,23 +341,27 @@ export default function PatientDetailPage() {
         <div className="flex items-center gap-2">
           {!isEditing ? (
             <>
+              {/* Show edit button for all users (same org has full access, shared users get full access as requested) */}
               <Button onClick={handleEdit} variant="outline">
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
               </Button>
-              <Button onClick={handleDelete} variant="destructive" disabled={isDeleting}>
-                {isDeleting ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </>
-                )}
-              </Button>
+              {/* Only show delete button for users from the patient's owning organization */}
+              {!patient.isShared && (
+                <Button onClick={handleDelete} variant="destructive" disabled={isDeleting}>
+                  {isDeleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </>
+                  )}
+                </Button>
+              )}
             </>
           ) : (
             <Button onClick={handleCancel} variant="outline">
@@ -357,6 +372,33 @@ export default function PatientDetailPage() {
         </div>
               </div>
             </div>
+
+            {/* Shared Patient Alert */}
+            {patient.isShared && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Share2 className="h-5 w-5 text-blue-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-medium text-blue-900">Shared Patient Access</h3>
+                    <p className="text-sm text-blue-700 mt-1">
+                      You have been granted access to this patient from {patient.organizationName}. 
+                      You can view and edit all patient information.
+                    </p>
+                    {patient.expiresAt && (
+                      <p className="text-sm text-blue-600 mt-1">
+                        Access expires: {new Date(patient.expiresAt).toLocaleDateString('en-AU', {
+                          day: '2-digit',
+                          month: '2-digit', 
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Patient Information Tabs */}
             <Tabs defaultValue="patient-info" className="w-full">

@@ -163,7 +163,7 @@ export const getPatients = query({
   },
 });
 
-// Get a specific patient by ID
+// Get a specific patient by ID - supports cross-organization access via token grants
 export const getPatient = query({
   args: { id: v.id("patients") },
   handler: async (ctx, args) => {
@@ -188,16 +188,82 @@ export const getPatient = query({
       throw new Error("Patient not found");
     }
 
-    // Ensure patient belongs to user's organization
-    if (patient.organizationId !== userProfile.organizationId) {
-      throw new Error("Access denied: Patient belongs to different organization");
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, args.id, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Access denied: No access to this patient");
     }
 
-    return patient;
+    // Get patient's organization for context
+    const patientOrg = await ctx.db.get(patient.organizationId);
+    const isSameOrganization = patient.organizationId === userProfile.organizationId;
+    
+    // Get access grant info if it's a shared patient
+    let accessInfo = null;
+    if (!isSameOrganization) {
+      const accessGrant = await ctx.db
+        .query("tokenAccessGrants")
+        .withIndex("by_patient", (q) => q.eq("patientId", args.id))
+        .filter((q) => q.eq(q.field("grantedTo"), userProfile._id))
+        .filter((q) => q.eq(q.field("status"), "approved"))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .first();
+      
+      if (accessGrant) {
+        accessInfo = {
+          isShared: true,
+          accessType: accessGrant.accessType,
+          permissions: accessGrant.permissions,
+          expiresAt: accessGrant.expiresAt,
+        };
+      }
+    }
+
+    return {
+      ...patient,
+      organizationName: patientOrg?.name,
+      organizationType: patientOrg?.type,
+      accessType: isSameOrganization ? "same_organization" : "cross_organization",
+      isShared: !isSameOrganization,
+      permissions: accessInfo?.permissions || (isSameOrganization ? ["view", "edit", "comment", "view_medications"] : ["view"]),
+      expiresAt: accessInfo?.expiresAt,
+    };
   },
 });
 
-// Update a patient
+// Helper function to check if user has access to a patient
+async function checkPatientAccess(ctx: any, patientId: any, userProfileId: any) {
+  const patient = await ctx.db.get(patientId);
+  if (!patient) return false;
+
+  const userProfile = await ctx.db.get(userProfileId);
+  if (!userProfile) return false;
+
+  // Same organization always has access
+  if (patient.organizationId === userProfile.organizationId) {
+    return true;
+  }
+
+  // Check if user has been granted access via token
+  const accessGrant = await ctx.db
+    .query("tokenAccessGrants")
+    .withIndex("by_patient", (q: any) => q.eq("patientId", patientId))
+    .filter((q: any) => q.eq(q.field("grantedTo"), userProfileId))
+    .filter((q: any) => q.eq(q.field("status"), "approved"))
+    .filter((q: any) => q.eq(q.field("isActive"), true))
+    .first();
+
+  if (!accessGrant) return false;
+
+  // Check if access has expired
+  if (accessGrant.expiresAt && accessGrant.expiresAt < Date.now()) {
+    return false;
+  }
+
+  return true;
+}
+
+// Update a patient - supports cross-organization access via token grants with edit permissions
 export const updatePatient = mutation({
   args: {
     id: v.id("patients"),
@@ -234,9 +300,31 @@ export const updatePatient = mutation({
       throw new Error("Patient not found");
     }
 
-    // Ensure patient belongs to user's organization
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, args.id, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Access denied: No access to this patient");
+    }
+
+    // Check edit permissions for cross-organization access
     if (patient.organizationId !== userProfile.organizationId) {
-      throw new Error("Access denied: Patient belongs to different organization");
+      const accessGrant = await ctx.db
+        .query("tokenAccessGrants")
+        .withIndex("by_patient", (q: any) => q.eq("patientId", args.id))
+        .filter((q: any) => q.eq(q.field("grantedTo"), userProfile._id))
+        .filter((q: any) => q.eq(q.field("status"), "approved"))
+        .filter((q: any) => q.eq(q.field("isActive"), true))
+        .first();
+
+      if (!accessGrant) {
+        throw new Error("Access denied: No access grant found");
+      }
+
+      // Check if user has edit permissions (for now, give full access like owner)
+      // In the future, you might want to restrict this based on accessGrant.permissions
+      if (accessGrant.expiresAt && accessGrant.expiresAt < Date.now()) {
+        throw new Error("Access denied: Access grant has expired");
+      }
     }
 
     const { id, ...updateData } = args;
@@ -259,7 +347,7 @@ export const updatePatient = mutation({
   },
 });
 
-// Soft delete a patient
+// Soft delete a patient - only allowed by patient's owning organization
 export const deletePatient = mutation({
   args: { id: v.id("patients") },
   handler: async (ctx, args) => {
@@ -284,9 +372,9 @@ export const deletePatient = mutation({
       throw new Error("Patient not found");
     }
 
-    // Ensure patient belongs to user's organization
+    // Only allow deletion by patient's owning organization for data integrity
     if (patient.organizationId !== userProfile.organizationId) {
-      throw new Error("Access denied: Patient belongs to different organization");
+      throw new Error("Access denied: Only the patient's owning organization can delete patient records");
     }
 
     await ctx.db.patch(args.id, {
