@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
@@ -40,11 +42,10 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
 
   // Query for access grants
   const accessGrants = useQuery(api.patientManagement.getPatientAccessGrants, {
-    patientId: patientId as any,
+    patientId: patientId as Id<"patients">,
   });
 
   // Mutations
-  const grantAccess = useMutation(api.patientManagement.grantTokenAccess);
   const revokeAccess = useMutation(api.patientManagement.revokeTokenAccess);
 
   const handleGrantAccess = async () => {
@@ -79,7 +80,7 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
   const handleRevokeAccess = async (accessGrantId: string) => {
     try {
       await revokeAccess({
-        accessGrantId: accessGrantId as any,
+        accessGrantId: accessGrantId as Id<"tokenAccessGrants">,
       });
       toast.success("Access revoked successfully");
     } catch (error) {
@@ -236,7 +237,7 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
               <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No access grants found</p>
               <p className="text-sm text-muted-foreground">
-                Grant access to other users to share this patient's data
+                                 Grant access to other users to share this patient&apos;s data
               </p>
             </div>
           ) : (

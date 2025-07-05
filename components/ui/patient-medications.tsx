@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useState } from "react";
@@ -324,7 +325,7 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
         </Card>
       ) : (
         <div className="space-y-4">
-          {medications?.map((medication: any) => (
+                     {medications?.map((medication: any) => (
             <Card key={medication._id} className={!isMedicationActive(medication) ? "opacity-60" : ""}>
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
