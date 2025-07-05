@@ -382,4 +382,27 @@ export default defineSchema({
     .index("by_created_at", ["createdAt"])
     .index("by_active", ["isActive"]),
 
+  // Patient scripts/documents (PDF and PNG files)
+  patientScripts: defineTable({
+    patientId: v.id("patients"),
+    fileName: v.string(),
+    originalFileName: v.string(),
+    fileType: v.union(
+      v.literal("application/pdf"),
+      v.literal("image/png")
+    ),
+    fileSize: v.number(), // in bytes
+    fileUrl: v.string(), // Convex file storage URL
+    uploadedBy: v.id("userProfiles"),
+    uploadedByOrg: v.id("organizations"),
+    uploadedAt: v.float64(),
+    description: v.optional(v.string()), // Optional description/notes
+    isActive: v.boolean(),
+  })
+    .index("by_patient", ["patientId"])
+    .index("by_uploaded_by", ["uploadedBy"])
+    .index("by_uploaded_at", ["uploadedAt"])
+    .index("by_file_type", ["fileType"])
+    .index("by_active", ["isActive"]),
+
 });

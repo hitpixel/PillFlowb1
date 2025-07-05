@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Edit, Save, X, Trash2, Copy, User, Calendar, Mail, Phone, MapPin, Package, Share2, Shield, Pill, MessageSquare } from "lucide-react";
+import { ArrowLeft, Edit, Save, X, Trash2, Copy, User, Calendar, Mail, Phone, MapPin, Package, Share2, Shield, Pill, MessageSquare, FileText } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -35,6 +35,7 @@ import { TokenAccessManagement } from "@/components/ui/token-access-management";
 import { PatientMedications } from "@/components/ui/patient-medications";
 import { PatientComments } from "@/components/ui/patient-comments";
 import { MedicationLog } from "@/components/ui/medication-log";
+import { PatientScripts } from "@/components/ui/patient-scripts";
 
 export default function PatientDetailPage() {
   const params = useParams();
@@ -423,7 +424,7 @@ export default function PatientDetailPage() {
 
             {/* Patient Information Tabs */}
             <Tabs defaultValue="patient-info" className="w-full">
-              <TabsList className={`grid w-full ${patient.isShared ? 'grid-cols-4' : 'grid-cols-5'}`}>
+              <TabsList className={`grid w-full ${patient.isShared ? 'grid-cols-5' : 'grid-cols-6'}`}>
                 <TabsTrigger value="patient-info" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
                   Patient Info
@@ -441,6 +442,10 @@ export default function PatientDetailPage() {
                 <TabsTrigger value="medication-log" className="flex items-center gap-2">
                   <Pill className="h-4 w-4" />
                   Medication Log
+                </TabsTrigger>
+                <TabsTrigger value="scripts" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Scripts
                 </TabsTrigger>
                 <TabsTrigger value="communication" className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
@@ -736,6 +741,11 @@ export default function PatientDetailPage() {
               {/* Medication Log Tab */}
               <TabsContent value="medication-log" className="space-y-4">
                 <MedicationLog patientId={patientId} />
+              </TabsContent>
+
+              {/* Scripts Tab */}
+              <TabsContent value="scripts" className="space-y-4">
+                <PatientScripts patientId={patientId} />
               </TabsContent>
 
               {/* Communication Tab */}

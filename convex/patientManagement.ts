@@ -1479,4 +1479,187 @@ async function logMedicationChange(ctx: any, params: {
     previousState: params.previousState,
     status: params.status || "completed",
   });
-} 
+}
+
+// SCRIPTS MANAGEMENT
+
+// Upload a script/document for a patient
+export const uploadPatientScript = mutation({
+  args: {
+    patientId: v.id("patients"),
+    fileName: v.string(),
+    originalFileName: v.string(),
+    fileType: v.union(
+      v.literal("application/pdf"),
+      v.literal("image/png")
+    ),
+    fileSize: v.number(),
+    fileUrl: v.string(),
+    description: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) throw new Error("User profile not found");
+
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Unauthorized: No access to this patient");
+    }
+
+    // Validate file type
+    if (args.fileType !== "application/pdf" && args.fileType !== "image/png") {
+      throw new Error("Only PDF and PNG files are allowed");
+    }
+
+    // Validate file size (max 10MB)
+    const maxFileSize = 10 * 1024 * 1024; // 10MB in bytes
+    if (args.fileSize > maxFileSize) {
+      throw new Error("File size must be less than 10MB");
+    }
+
+    const scriptId = await ctx.db.insert("patientScripts", {
+      patientId: args.patientId,
+      fileName: args.fileName,
+      originalFileName: args.originalFileName,
+      fileType: args.fileType,
+      fileSize: args.fileSize,
+      fileUrl: args.fileUrl,
+      uploadedBy: userProfile._id,
+      uploadedByOrg: userProfile.organizationId!,
+      uploadedAt: Date.now(),
+      description: args.description,
+      isActive: true,
+    });
+
+    // Add to communication log
+    await ctx.db.insert("patientComments", {
+      patientId: args.patientId,
+      authorId: userProfile._id,
+      authorOrg: userProfile.organizationId!,
+      content: `Uploaded script: ${args.originalFileName}${args.description ? ` - ${args.description}` : ''}`,
+      commentType: "system",
+      isPrivate: false,
+      isActive: true,
+      createdAt: Date.now(),
+    });
+
+    return scriptId;
+  },
+});
+
+// Get patient scripts
+export const getPatientScripts = query({
+  args: {
+    patientId: v.id("patients"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) throw new Error("User profile not found");
+
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Unauthorized: No access to this patient");
+    }
+
+    const scripts = await ctx.db
+      .query("patientScripts")
+      .withIndex("by_patient", (q) => q.eq("patientId", args.patientId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .order("desc")
+      .collect();
+
+    // Enrich with user and organization details
+    const enrichedScripts = await Promise.all(
+      scripts.map(async (script) => {
+        const uploadedByUser = await ctx.db.get(script.uploadedBy);
+        const uploadedByOrg = await ctx.db.get(script.uploadedByOrg);
+
+        return {
+          ...script,
+          uploadedByUser: uploadedByUser ? {
+            firstName: uploadedByUser.firstName,
+            lastName: uploadedByUser.lastName,
+          } : null,
+          uploadedByOrg: uploadedByOrg ? {
+            name: uploadedByOrg.name,
+            type: uploadedByOrg.type,
+          } : null,
+        };
+      })
+    );
+
+    return enrichedScripts;
+  },
+});
+
+// Delete a patient script
+export const deletePatientScript = mutation({
+  args: {
+    scriptId: v.id("patientScripts"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) throw new Error("User profile not found");
+
+    const script = await ctx.db.get(args.scriptId);
+    if (!script) throw new Error("Script not found");
+
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, script.patientId, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Unauthorized: No access to this patient");
+    }
+
+    // Only allow deletion if user is from the same organization that uploaded the script
+    // or if user is from the patient's organization
+    const patient = await ctx.db.get(script.patientId);
+    const canDelete = script.uploadedBy === userProfile._id || 
+                     (patient && patient.organizationId === userProfile.organizationId);
+
+    if (!canDelete) {
+      throw new Error("Unauthorized: You can only delete scripts you uploaded or if you're from the patient's organization");
+    }
+
+    // Mark as inactive instead of deleting
+    await ctx.db.patch(args.scriptId, {
+      isActive: false,
+    });
+
+    // Add to communication log
+    await ctx.db.insert("patientComments", {
+      patientId: script.patientId,
+      authorId: userProfile._id,
+      authorOrg: userProfile.organizationId!,
+      content: `Deleted script: ${script.originalFileName}`,
+      commentType: "system",
+      isPrivate: false,
+      isActive: true,
+      createdAt: Date.now(),
+    });
+
+    return true;
+  },
+}); 
