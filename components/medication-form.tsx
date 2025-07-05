@@ -16,7 +16,11 @@ import { type MedicationSuggestion } from "@/lib/fda-api";
 interface MedicationFormData {
   medicationName: string;
   dosage: string;
-  frequency: string;
+  // Timing fields instead of frequency
+  morningDose: string;
+  afternoonDose: string;
+  eveningDose: string;
+  nightDose: string;
   instructions: string;
   prescribedBy: string;
   prescribedDate: string;
@@ -51,7 +55,11 @@ export function MedicationForm({
   const [formData, setFormData] = useState<MedicationFormData>({
     medicationName: initialData?.medicationName || "",
     dosage: initialData?.dosage || "",
-    frequency: initialData?.frequency || "",
+    // Timing fields instead of frequency
+    morningDose: initialData?.morningDose || "",
+    afternoonDose: initialData?.afternoonDose || "",
+    eveningDose: initialData?.eveningDose || "",
+    nightDose: initialData?.nightDose || "",
     instructions: initialData?.instructions || "",
     prescribedBy: initialData?.prescribedBy || "",
     prescribedDate: initialData?.prescribedDate || "",
@@ -102,8 +110,14 @@ export function MedicationForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.medicationName || !formData.dosage || !formData.frequency) {
-      toast.error("Please fill in all required fields");
+    if (!formData.medicationName || !formData.dosage) {
+      toast.error("Please fill in medication name and dosage");
+      return;
+    }
+
+    // Check if at least one timing dose is provided
+    if (!formData.morningDose && !formData.afternoonDose && !formData.eveningDose && !formData.nightDose) {
+      toast.error("Please specify at least one timing dose");
       return;
     }
 
@@ -216,17 +230,6 @@ export function MedicationForm({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="frequency">Frequency *</Label>
-                <Input
-                  id="frequency"
-                  value={formData.frequency}
-                  onChange={(e) => handleInputChange("frequency", e.target.value)}
-                  placeholder="e.g., Once daily, Twice daily"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="route">Route</Label>
                 <Input
                   id="route"
@@ -234,6 +237,56 @@ export function MedicationForm({
                   onChange={(e) => handleInputChange("route", e.target.value)}
                   placeholder="e.g., Oral, Topical"
                 />
+              </div>
+            </div>
+
+            {/* Timing Dosage Fields */}
+            <div className="space-y-4">
+              <h4 className="text-md font-semibold">Dosing Schedule</h4>
+              <p className="text-sm text-muted-foreground">
+                Specify doses for different times of day. Leave blank for times when medication is not taken.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="morningDose">Morning Dose</Label>
+                  <Input
+                    id="morningDose"
+                    value={formData.morningDose}
+                    onChange={(e) => handleInputChange("morningDose", e.target.value)}
+                    placeholder="e.g., 1 tablet"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="afternoonDose">Afternoon Dose</Label>
+                  <Input
+                    id="afternoonDose"
+                    value={formData.afternoonDose}
+                    onChange={(e) => handleInputChange("afternoonDose", e.target.value)}
+                    placeholder="e.g., 1 tablet"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="eveningDose">Evening Dose</Label>
+                  <Input
+                    id="eveningDose"
+                    value={formData.eveningDose}
+                    onChange={(e) => handleInputChange("eveningDose", e.target.value)}
+                    placeholder="e.g., 1 tablet"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="nightDose">Night Dose</Label>
+                  <Input
+                    id="nightDose"
+                    value={formData.nightDose}
+                    onChange={(e) => handleInputChange("nightDose", e.target.value)}
+                    placeholder="e.g., 1 tablet"
+                  />
+                </div>
               </div>
             </div>
 

@@ -216,7 +216,11 @@ export default defineSchema({
     organizationId: v.id("organizations"), // Which org added this medication
     medicationName: v.string(),
     dosage: v.string(),
-    frequency: v.string(),
+    // Timing fields instead of frequency
+    morningDose: v.optional(v.string()), // e.g., "1 tablet", "2mg"
+    afternoonDose: v.optional(v.string()),
+    eveningDose: v.optional(v.string()),
+    nightDose: v.optional(v.string()),
     instructions: v.optional(v.string()),
     prescribedBy: v.optional(v.string()), // Doctor name
     prescribedDate: v.optional(v.string()), // YYYY-MM-DD format
@@ -241,6 +245,36 @@ export default defineSchema({
     .index("by_organization", ["organizationId"])
     .index("by_active", ["isActive"])
     .index("by_added_by", ["addedBy"]),
+
+  // Medication change log for audit trail
+  medicationLogs: defineTable({
+    patientId: v.id("patients"),
+    medicationId: v.optional(v.id("patientMedications")), // null for deletions
+    actionType: v.union(
+      v.literal("added"),
+      v.literal("updated"),
+      v.literal("stopped"),
+      v.literal("deleted")
+    ),
+    medicationName: v.string(),
+    changes: v.optional(v.string()), // JSON string of changes made
+    performedBy: v.id("userProfiles"),
+    performedByOrg: v.id("organizations"),
+    performedAt: v.float64(),
+    // Current medication state at time of change
+    currentDosage: v.optional(v.string()),
+    currentMorningDose: v.optional(v.string()),
+    currentAfternoonDose: v.optional(v.string()),
+    currentEveningDose: v.optional(v.string()),
+    currentNightDose: v.optional(v.string()),
+    currentInstructions: v.optional(v.string()),
+    previousState: v.optional(v.string()), // JSON string of previous state
+  })
+    .index("by_patient", ["patientId"])
+    .index("by_medication", ["medicationId"])
+    .index("by_performed_by", ["performedBy"])
+    .index("by_performed_at", ["performedAt"])
+    .index("by_action_type", ["actionType"]),
 
   // Patient comments/chat system
   patientComments: defineTable({

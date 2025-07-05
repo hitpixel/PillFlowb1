@@ -34,6 +34,7 @@ import {
 import { TokenAccessManagement } from "@/components/ui/token-access-management";
 import { PatientMedications } from "@/components/ui/patient-medications";
 import { PatientComments } from "@/components/ui/patient-comments";
+import { MedicationLog } from "@/components/ui/medication-log";
 
 export default function PatientDetailPage() {
   const params = useParams();
@@ -422,18 +423,24 @@ export default function PatientDetailPage() {
 
             {/* Patient Information Tabs */}
             <Tabs defaultValue="patient-info" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className={`grid w-full ${patient.isShared ? 'grid-cols-4' : 'grid-cols-5'}`}>
                 <TabsTrigger value="patient-info" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
                   Patient Info
                 </TabsTrigger>
-                <TabsTrigger value="token-access" className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Token Access
-                </TabsTrigger>
+                {!patient.isShared && (
+                  <TabsTrigger value="token-access" className="flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Token Access
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="medications" className="flex items-center gap-2">
                   <Pill className="h-4 w-4" />
                   Medications
+                </TabsTrigger>
+                <TabsTrigger value="medication-log" className="flex items-center gap-2">
+                  <Pill className="h-4 w-4" />
+                  Medication Log
                 </TabsTrigger>
                 <TabsTrigger value="communication" className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
@@ -714,14 +721,21 @@ export default function PatientDetailPage() {
                 </Card>
               </TabsContent>
 
-              {/* Token Access Tab */}
-              <TabsContent value="token-access" className="space-y-4">
-                <TokenAccessManagement patientId={patientId} />
-              </TabsContent>
+              {/* Token Access Tab - Only shown for non-shared access */}
+              {!patient.isShared && (
+                <TabsContent value="token-access" className="space-y-4">
+                  <TokenAccessManagement patientId={patientId} />
+                </TabsContent>
+              )}
 
               {/* Medications Tab */}
               <TabsContent value="medications" className="space-y-4">
                 <PatientMedications patientId={patientId} />
+              </TabsContent>
+
+              {/* Medication Log Tab */}
+              <TabsContent value="medication-log" className="space-y-4">
+                <MedicationLog patientId={patientId} />
               </TabsContent>
 
               {/* Communication Tab */}

@@ -40,7 +40,11 @@ interface PatientMedicationsProps {
 interface MedicationFormData {
   medicationName: string;
   dosage: string;
-  frequency: string;
+  // Timing fields instead of frequency
+  morningDose: string;
+  afternoonDose: string;
+  eveningDose: string;
+  nightDose: string;
   instructions: string;
   prescribedBy: string;
   prescribedDate: string;
@@ -78,7 +82,11 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
         patientId: patientId as any,
         medicationName: data.medicationName,
         dosage: data.dosage,
-        frequency: data.frequency,
+        // Timing fields instead of frequency
+        morningDose: data.morningDose || undefined,
+        afternoonDose: data.afternoonDose || undefined,
+        eveningDose: data.eveningDose || undefined,
+        nightDose: data.nightDose || undefined,
         instructions: data.instructions || undefined,
         prescribedBy: data.prescribedBy || undefined,
         prescribedDate: data.prescribedDate || undefined,
@@ -114,7 +122,11 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
         medicationId: editingMedication._id,
         medicationName: data.medicationName,
         dosage: data.dosage,
-        frequency: data.frequency,
+        // Timing fields instead of frequency
+        morningDose: data.morningDose || undefined,
+        afternoonDose: data.afternoonDose || undefined,
+        eveningDose: data.eveningDose || undefined,
+        nightDose: data.nightDose || undefined,
         instructions: data.instructions || undefined,
         prescribedBy: data.prescribedBy || undefined,
         prescribedDate: data.prescribedDate || undefined,
@@ -177,7 +189,11 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
     return {
       medicationName: medication.medicationName,
       dosage: medication.dosage,
-      frequency: medication.frequency,
+      // Timing fields instead of frequency
+      morningDose: medication.morningDose || "",
+      afternoonDose: medication.afternoonDose || "",
+      eveningDose: medication.eveningDose || "",
+      nightDose: medication.nightDose || "",
       instructions: medication.instructions || "",
       prescribedBy: medication.prescribedBy || "",
       prescribedDate: medication.prescribedDate || "",
@@ -319,9 +335,17 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                   <div>
-                    <p className="text-muted-foreground mb-1">Dosage & Frequency</p>
+                    <p className="text-muted-foreground mb-1">Dosage & Schedule</p>
                     <p className="font-medium">{medication.dosage}</p>
-                    <p className="text-muted-foreground">{medication.frequency}</p>
+                    <div className="text-xs text-muted-foreground mt-1 space-y-1">
+                      {medication.morningDose && <p>Morning: {medication.morningDose}</p>}
+                      {medication.afternoonDose && <p>Afternoon: {medication.afternoonDose}</p>}
+                      {medication.eveningDose && <p>Evening: {medication.eveningDose}</p>}
+                      {medication.nightDose && <p>Night: {medication.nightDose}</p>}
+                      {!medication.morningDose && !medication.afternoonDose && !medication.eveningDose && !medication.nightDose && (
+                        <p className="text-muted-foreground">No schedule specified</p>
+                      )}
+                    </div>
                     {medication.route && (
                       <p className="text-xs text-muted-foreground mt-1">
                         <Layers className="h-3 w-3 inline mr-1" />

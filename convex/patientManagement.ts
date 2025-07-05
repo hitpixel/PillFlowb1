@@ -339,7 +339,11 @@ export const addPatientMedication = mutation({
     patientId: v.id("patients"),
     medicationName: v.string(),
     dosage: v.string(),
-    frequency: v.string(),
+    // Timing fields instead of frequency
+    morningDose: v.optional(v.string()),
+    afternoonDose: v.optional(v.string()),
+    eveningDose: v.optional(v.string()),
+    nightDose: v.optional(v.string()),
     instructions: v.optional(v.string()),
     prescribedBy: v.optional(v.string()),
     prescribedDate: v.optional(v.string()),
@@ -376,12 +380,16 @@ export const addPatientMedication = mutation({
       throw new Error("Unauthorized: No access to this patient");
     }
 
-    return await ctx.db.insert("patientMedications", {
+    const medicationId = await ctx.db.insert("patientMedications", {
       patientId: args.patientId,
       organizationId: userProfile.organizationId!,
       medicationName: args.medicationName,
       dosage: args.dosage,
-      frequency: args.frequency,
+      // Timing fields instead of frequency
+      morningDose: args.morningDose,
+      afternoonDose: args.afternoonDose,
+      eveningDose: args.eveningDose,
+      nightDose: args.nightDose,
       instructions: args.instructions,
       prescribedBy: args.prescribedBy,
       prescribedDate: args.prescribedDate,
@@ -400,6 +408,36 @@ export const addPatientMedication = mutation({
       addedBy: userProfile._id,
       addedAt: Date.now(),
     });
+
+    // Log the medication addition
+    await logMedicationChange(ctx, {
+      patientId: args.patientId,
+      medicationId,
+      actionType: "added",
+      medicationName: args.medicationName,
+      performedBy: userProfile._id,
+      performedByOrg: userProfile.organizationId!,
+      currentDosage: args.dosage,
+      currentMorningDose: args.morningDose,
+      currentAfternoonDose: args.afternoonDose,
+      currentEveningDose: args.eveningDose,
+      currentNightDose: args.nightDose,
+      currentInstructions: args.instructions,
+    });
+
+    // Add to communication log
+    await ctx.db.insert("patientComments", {
+      patientId: args.patientId,
+      authorId: userProfile._id,
+      authorOrg: userProfile.organizationId!,
+      content: `Added medication: ${args.medicationName}${args.dosage ? ` (${args.dosage})` : ''}`,
+      commentType: "system",
+      isPrivate: false,
+      isActive: true,
+      createdAt: Date.now(),
+    });
+
+    return medicationId;
   },
 });
 
@@ -409,7 +447,11 @@ export const updatePatientMedication = mutation({
     medicationId: v.id("patientMedications"),
     medicationName: v.optional(v.string()),
     dosage: v.optional(v.string()),
-    frequency: v.optional(v.string()),
+    // Timing fields instead of frequency
+    morningDose: v.optional(v.string()),
+    afternoonDose: v.optional(v.string()),
+    eveningDose: v.optional(v.string()),
+    nightDose: v.optional(v.string()),
     instructions: v.optional(v.string()),
     prescribedBy: v.optional(v.string()),
     prescribedDate: v.optional(v.string()),
@@ -453,7 +495,11 @@ export const updatePatientMedication = mutation({
 
     if (args.medicationName !== undefined) updates.medicationName = args.medicationName;
     if (args.dosage !== undefined) updates.dosage = args.dosage;
-    if (args.frequency !== undefined) updates.frequency = args.frequency;
+    // Timing fields instead of frequency
+    if (args.morningDose !== undefined) updates.morningDose = args.morningDose;
+    if (args.afternoonDose !== undefined) updates.afternoonDose = args.afternoonDose;
+    if (args.eveningDose !== undefined) updates.eveningDose = args.eveningDose;
+    if (args.nightDose !== undefined) updates.nightDose = args.nightDose;
     if (args.instructions !== undefined) updates.instructions = args.instructions;
     if (args.prescribedBy !== undefined) updates.prescribedBy = args.prescribedBy;
     if (args.prescribedDate !== undefined) updates.prescribedDate = args.prescribedDate;
@@ -470,7 +516,51 @@ export const updatePatientMedication = mutation({
     if (args.activeIngredient !== undefined) updates.activeIngredient = args.activeIngredient;
     if (args.strength !== undefined) updates.strength = args.strength;
 
+    // Store previous state for logging
+    const previousState = JSON.stringify({
+      medicationName: medication.medicationName,
+      dosage: medication.dosage,
+      morningDose: medication.morningDose,
+      afternoonDose: medication.afternoonDose,
+      eveningDose: medication.eveningDose,
+      nightDose: medication.nightDose,
+      instructions: medication.instructions,
+    });
+
     await ctx.db.patch(args.medicationId, updates);
+
+    // Get updated medication for logging
+    const updatedMedication = await ctx.db.get(args.medicationId);
+
+    // Log the medication update
+    await logMedicationChange(ctx, {
+      patientId: medication.patientId,
+      medicationId: args.medicationId,
+      actionType: args.isActive === false ? "stopped" : "updated",
+      medicationName: updatedMedication?.medicationName || medication.medicationName,
+      performedBy: userProfile._id,
+      performedByOrg: userProfile.organizationId!,
+      currentDosage: updatedMedication?.dosage,
+      currentMorningDose: updatedMedication?.morningDose,
+      currentAfternoonDose: updatedMedication?.afternoonDose,
+      currentEveningDose: updatedMedication?.eveningDose,
+      currentNightDose: updatedMedication?.nightDose,
+      currentInstructions: updatedMedication?.instructions,
+      previousState,
+    });
+
+    // Add to communication log
+    const action = args.isActive === false ? "stopped" : "updated";
+    await ctx.db.insert("patientComments", {
+      patientId: medication.patientId,
+      authorId: userProfile._id,
+      authorOrg: userProfile.organizationId!,
+      content: `${action === "stopped" ? "Stopped" : "Updated"} medication: ${updatedMedication?.medicationName || medication.medicationName}`,
+      commentType: "system",
+      isPrivate: false,
+      isActive: true,
+      createdAt: Date.now(),
+    });
   },
 });
 
@@ -632,6 +722,58 @@ export const getPatientComments = query({
   },
 });
 
+// Get patient medication logs
+export const getPatientMedicationLogs = query({
+  args: {
+    patientId: v.id("patients"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) throw new Error("User profile not found");
+
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Unauthorized: No access to this patient");
+    }
+
+    const logs = await ctx.db
+      .query("medicationLogs")
+      .withIndex("by_patient", (q) => q.eq("patientId", args.patientId))
+      .order("desc")
+      .collect();
+
+    // Enrich with user and organization details
+    const enrichedLogs = await Promise.all(
+      logs.map(async (log) => {
+        const performedByUser = await ctx.db.get(log.performedBy);
+        const performedByOrg = await ctx.db.get(log.performedByOrg);
+
+        return {
+          ...log,
+          performedByUser: performedByUser ? {
+            firstName: performedByUser.firstName,
+            lastName: performedByUser.lastName,
+          } : null,
+          performedByOrg: performedByOrg ? {
+            name: performedByOrg.name,
+            type: performedByOrg.type,
+          } : null,
+        };
+      })
+    );
+
+    return enrichedLogs;
+  },
+});
+
 // HELPER FUNCTIONS
 
 // Check if user has access to a patient
@@ -670,4 +812,40 @@ async function checkPatientAccess(ctx: any, patientId: any, userProfileId: any) 
   }
 
   return true;
+}
+
+// Helper function to log medication changes
+async function logMedicationChange(ctx: any, params: {
+  patientId: any;
+  medicationId?: any;
+  actionType: "added" | "updated" | "stopped" | "deleted";
+  medicationName: string;
+  performedBy: any;
+  performedByOrg: any;
+  currentDosage?: string;
+  currentMorningDose?: string;
+  currentAfternoonDose?: string;
+  currentEveningDose?: string;
+  currentNightDose?: string;
+  currentInstructions?: string;
+  changes?: string;
+  previousState?: string;
+}) {
+  await ctx.db.insert("medicationLogs", {
+    patientId: params.patientId,
+    medicationId: params.medicationId,
+    actionType: params.actionType,
+    medicationName: params.medicationName,
+    changes: params.changes,
+    performedBy: params.performedBy,
+    performedByOrg: params.performedByOrg,
+    performedAt: Date.now(),
+    currentDosage: params.currentDosage,
+    currentMorningDose: params.currentMorningDose,
+    currentAfternoonDose: params.currentAfternoonDose,
+    currentEveningDose: params.currentEveningDose,
+    currentNightDose: params.currentNightDose,
+    currentInstructions: params.currentInstructions,
+    previousState: params.previousState,
+  });
 } 
