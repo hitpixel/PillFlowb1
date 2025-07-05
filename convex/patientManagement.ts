@@ -592,7 +592,17 @@ export const getPatientMedications = query({
       .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
 
-    // Enrich with user, organization details, and pending requests
+    // Get pending addition requests
+    const pendingAdditionRequests = await ctx.db
+      .query("medicationChangeRequests")
+      .withIndex("by_patient", (q) => q.eq("patientId", args.patientId))
+      .filter((q) => q.and(
+        q.eq(q.field("requestType"), "add"),
+        q.eq(q.field("status"), "pending")
+      ))
+      .collect();
+
+    // Enrich existing medications with user, organization details, and pending requests
     const enrichedMedications = await Promise.all(
       medications.map(async (medication) => {
         const addedByUser = await ctx.db.get(medication.addedBy);
@@ -642,11 +652,74 @@ export const getPatientMedications = query({
           } : null,
           pendingRequest: requestDetails,
           hasPendingRequest: pendingRequests.length > 0,
+          isPendingAddition: false,
         };
       })
     );
 
-    return enrichedMedications;
+    // Convert pending addition requests to medication-like objects
+    const pendingAdditions = await Promise.all(
+      pendingAdditionRequests.map(async (request) => {
+        const requestedByUser = await ctx.db.get(request.requestedBy);
+        const requestedByOrg = await ctx.db.get(request.requestedByOrg);
+        
+        return {
+          _id: `pending_${request._id}`, // Use a prefixed ID to avoid conflicts
+          patientId: request.patientId,
+          organizationId: request.requestedByOrg,
+          medicationName: request.requestedChanges.medicationName || "",
+          dosage: request.requestedChanges.dosage || "",
+          morningDose: request.requestedChanges.morningDose,
+          afternoonDose: request.requestedChanges.afternoonDose,
+          eveningDose: request.requestedChanges.eveningDose,
+          nightDose: request.requestedChanges.nightDose,
+          instructions: request.requestedChanges.instructions,
+          prescribedBy: request.requestedChanges.prescribedBy,
+          prescribedDate: request.requestedChanges.prescribedDate,
+          startDate: request.requestedChanges.startDate,
+          endDate: request.requestedChanges.endDate,
+          fdaNdc: request.requestedChanges.fdaNdc,
+          genericName: request.requestedChanges.genericName,
+          brandName: request.requestedChanges.brandName,
+          dosageForm: request.requestedChanges.dosageForm,
+          route: request.requestedChanges.route,
+          manufacturer: request.requestedChanges.manufacturer,
+          activeIngredient: request.requestedChanges.activeIngredient,
+          strength: request.requestedChanges.strength,
+          isActive: true,
+          addedBy: request.requestedBy,
+          addedAt: request.requestedAt,
+          addedByUser: requestedByUser ? {
+            firstName: requestedByUser.firstName,
+            lastName: requestedByUser.lastName,
+          } : null,
+          organization: requestedByOrg ? {
+            name: requestedByOrg.name,
+            type: requestedByOrg.type,
+          } : null,
+          pendingRequest: {
+            requestId: request._id,
+            requestType: "add",
+            requestedAt: request.requestedAt,
+            requestNotes: request.requestNotes,
+            requestedBy: requestedByUser ? {
+              firstName: requestedByUser.firstName,
+              lastName: requestedByUser.lastName,
+            } : null,
+            requestedByOrg: requestedByOrg ? {
+              name: requestedByOrg.name,
+              type: requestedByOrg.type,
+            } : null,
+            requestedChanges: request.requestedChanges,
+          },
+          hasPendingRequest: true,
+          isPendingAddition: true,
+        };
+      })
+    );
+
+    // Combine real medications and pending additions
+    return [...enrichedMedications, ...pendingAdditions];
   },
 });
 
@@ -1203,71 +1276,6 @@ export const rejectMedicationRequest = mutation({
   },
 });
 
-// Get pending medication requests for a patient
-export const getPendingMedicationRequests = query({
-  args: {
-    patientId: v.id("patients"),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Authentication required");
-
-    const userProfile = await ctx.db
-      .query("userProfiles")
-      .withIndex("by_user_id", (q) => q.eq("userId", userId))
-      .first();
-
-    if (!userProfile) throw new Error("User profile not found");
-
-    // Check if user has access to this patient
-    const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
-    if (!hasAccess) {
-      throw new Error("Unauthorized: No access to this patient");
-    }
-
-    const requests = await ctx.db
-      .query("medicationChangeRequests")
-      .withIndex("by_patient", (q) => q.eq("patientId", args.patientId))
-      .filter((q) => q.eq(q.field("status"), "pending"))
-      .order("desc")
-      .collect();
-
-    // Enrich with user and medication details
-    const enrichedRequests = await Promise.all(
-      requests.map(async (request) => {
-        const requestedByUser = await ctx.db.get(request.requestedBy);
-        const requestedByOrg = await ctx.db.get(request.requestedByOrg);
-        
-        // For addition requests, medicationId will be null/undefined
-        let medication = null;
-        if (request.medicationId) {
-          medication = await ctx.db.get(request.medicationId);
-        }
-
-        return {
-          ...request,
-          requestedByUser: requestedByUser ? {
-            firstName: requestedByUser.firstName,
-            lastName: requestedByUser.lastName,
-          } : null,
-          requestedByOrg: requestedByOrg ? {
-            name: requestedByOrg.name,
-            type: requestedByOrg.type,
-          } : null,
-          medication: medication ? {
-            medicationName: medication.medicationName,
-            dosage: medication.dosage,
-          } : request.requestType === "add" ? {
-            medicationName: request.requestedChanges.medicationName || "",
-            dosage: request.requestedChanges.dosage || "",
-          } : null,
-        };
-      })
-    );
-
-    return enrichedRequests;
-  },
-});
 
 // Request medication addition (for shared users)
 export const requestMedicationAddition = mutation({

@@ -72,9 +72,6 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   const medications = useQuery(api.patientManagement.getPatientMedications, {
     patientId: patientId as any,
   });
-  const pendingRequests = useQuery(api.patientManagement.getPendingMedicationRequests, {
-    patientId: patientId as any,
-  });
   const currentUser = useQuery(api.users.getCurrentUserProfile);
 
 
@@ -301,6 +298,9 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   };
 
   const isMedicationActive = (medication: any) => {
+    if (medication.isPendingAddition) {
+      return true; // Pending additions should be considered "active" for display purposes
+    }
     if (!medication.isActive) return false;
     if (medication.endDate) {
       const endDate = new Date(medication.endDate);
@@ -390,113 +390,6 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
         </div>
       </div>
 
-      {/* Pending Addition Requests */}
-      {pendingRequests && pendingRequests.filter((req: any) => req.requestType === "add").length > 0 && (
-        <div className="space-y-4">
-          <h4 className="text-md font-semibold text-orange-700">Pending Addition Requests</h4>
-          {pendingRequests
-            .filter((req: any) => req.requestType === "add")
-            .map((request: any) => (
-              <Card key={request._id} className="border-orange-200 bg-orange-50">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <Pill className="h-5 w-5 text-orange-600" />
-                        <h4 className="text-lg font-semibold">{request.requestedChanges.medicationName}</h4>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className="bg-orange-100 text-orange-800">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Addition Requested
-                        </Badge>
-                        <Badge variant="outline">
-                          <Building2 className="h-3 w-3 mr-1" />
-                          {request.requestedByOrg?.name}
-                        </Badge>
-                      </div>
-                    </div>
-                    {currentUser && !isSharedAccess({ organizationId: request.requestedByOrg?._id }) && (
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="default" 
-                          size="sm"
-                          onClick={() => handleApproveRequest(request._id)}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          Approve
-                        </Button>
-                        <Button 
-                          variant="destructive" 
-                          size="sm"
-                          onClick={() => handleRejectRequest(request._id)}
-                        >
-                          Reject
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground mb-1">Dosage & Schedule</p>
-                      <p className="font-medium">{request.requestedChanges.dosage}</p>
-                      <div className="mt-2 space-y-1">
-                        {request.requestedChanges.morningDose && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Morning:</span>
-                            <span>{request.requestedChanges.morningDose}</span>
-                          </div>
-                        )}
-                        {request.requestedChanges.afternoonDose && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Afternoon:</span>
-                            <span>{request.requestedChanges.afternoonDose}</span>
-                          </div>
-                        )}
-                        {request.requestedChanges.eveningDose && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Evening:</span>
-                            <span>{request.requestedChanges.eveningDose}</span>
-                          </div>
-                        )}
-                        {request.requestedChanges.nightDose && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Night:</span>
-                            <span>{request.requestedChanges.nightDose}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {request.requestedChanges.instructions && (
-                      <div>
-                        <p className="text-muted-foreground mb-1">Instructions</p>
-                        <p className="text-sm">{request.requestedChanges.instructions}</p>
-                      </div>
-                    )}
-
-                    <div>
-                      <p className="text-muted-foreground mb-1">Requested by</p>
-                      <p className="text-sm">{request.requestedByUser?.firstName} {request.requestedByUser?.lastName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(request.requestedAt).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-
-                  {request.requestNotes && (
-                    <div className="mt-4 p-3 bg-white rounded border border-orange-200">
-                      <p className="text-sm font-medium text-orange-700 mb-1">Request Notes:</p>
-                      <p className="text-sm">{request.requestNotes}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-        </div>
-      )}
-
       {/* Medications List */}
       {medications?.length === 0 ? (
         <Card>
@@ -518,7 +411,9 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
             })
             ?.map((medication: any) => {
             let cardClassName = "";
-            if (!isMedicationActive(medication)) {
+            if (medication.isPendingAddition) {
+              cardClassName = "border-yellow-200 bg-yellow-50";
+            } else if (!isMedicationActive(medication)) {
               cardClassName = "opacity-60 border-gray-200";
             } else if (medication.hasPendingRequest) {
               if (medication.pendingRequest?.requestType === "remove") {
@@ -538,7 +433,12 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                       <h4 className="text-lg font-semibold">{medication.medicationName}</h4>
                     </div>
                     <div className="flex items-center gap-2">
-                      {isMedicationActive(medication) ? (
+                      {medication.isPendingAddition ? (
+                        <Badge className="bg-yellow-100 text-yellow-800">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Addition Pending
+                        </Badge>
+                      ) : isMedicationActive(medication) ? (
                         <Badge className="bg-green-100 text-green-800">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Active
@@ -549,7 +449,7 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                           {medication.isActive === false ? "Removed" : "Stopped"}
                         </Badge>
                       )}
-                      {medication.hasPendingRequest && (
+                      {medication.hasPendingRequest && !medication.isPendingAddition && (
                         <Badge className={medication.pendingRequest?.requestType === "remove" ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"}>
                           <Clock className="h-3 w-3 mr-1" />
                           {medication.pendingRequest?.requestType === "remove" ? "Removal Pending" : "Changes Pending"}
@@ -568,49 +468,52 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingMedication(medication);
-                        }}
-                      >
-                        <Edit className="h-3 w-3 mr-1" />
-                        Edit
-                      </Button>
-                      {editingMedication?._id === medication._id && (
-                        <Dialog 
-                          open={true}
-                          onOpenChange={(open) => {
-                            if (!open) {
-                              setEditingMedication(null);
-                            }
+                    {!medication.isPendingAddition && (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingMedication(medication);
                           }}
                         >
-                          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                              <DialogTitle>Edit Medication</DialogTitle>
-                              <DialogDescription>
-                                Update medication details
-                              </DialogDescription>
-                            </DialogHeader>
-                            <MedicationForm
-                              initialData={getEditInitialData(medication)}
-                              onSubmit={handleEditMedication}
-                              onRequestChange={handleRequestChange}
-                              onCancel={() => setEditingMedication(null)}
-                              isLoading={isSubmitting}
-                              isEdit={true}
-                              isSharedAccess={isSharedAccess(medication)}
-                              canRequestRemoval={true}
-                            />
-                          </DialogContent>
-                        </Dialog>
-                      )}
-                    </>
-                    {medication.hasPendingRequest && medication.pendingRequest && !isSharedAccess(medication) && (
+                          <Edit className="h-3 w-3 mr-1" />
+                          Edit
+                        </Button>
+                        {editingMedication?._id === medication._id && (
+                          <Dialog 
+                            open={true}
+                            onOpenChange={(open) => {
+                              if (!open) {
+                                setEditingMedication(null);
+                              }
+                            }}
+                          >
+                            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                              <DialogHeader>
+                                <DialogTitle>Edit Medication</DialogTitle>
+                                <DialogDescription>
+                                  Update medication details
+                                </DialogDescription>
+                              </DialogHeader>
+                              <MedicationForm
+                                initialData={getEditInitialData(medication)}
+                                onSubmit={handleEditMedication}
+                                onRequestChange={handleRequestChange}
+                                onCancel={() => setEditingMedication(null)}
+                                isLoading={isSubmitting}
+                                isEdit={true}
+                                isSharedAccess={isSharedAccess(medication)}
+                                canRequestRemoval={true}
+                              />
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                      </>
+                    )}
+                    {((medication.hasPendingRequest && medication.pendingRequest && !isSharedAccess(medication)) || 
+                      (medication.isPendingAddition && !isSharedAccess(medication))) && (
                       <div className="flex items-center gap-2">
                         <Button 
                           variant="default" 
@@ -629,7 +532,7 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                         </Button>
                       </div>
                     )}
-                    {isMedicationActive(medication) && !medication.hasPendingRequest && (
+                    {isMedicationActive(medication) && !medication.hasPendingRequest && !medication.isPendingAddition && (
                       <Button 
                         variant="destructive" 
                         size="sm"
@@ -701,7 +604,7 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                     <div className={`border rounded-lg p-3 ${medication.pendingRequest.requestType === "remove" ? "bg-red-50 border-red-200" : "bg-yellow-50 border-yellow-200"}`}>
                       <p className={`text-sm font-medium mb-2 flex items-center gap-2 ${medication.pendingRequest.requestType === "remove" ? "text-red-900" : "text-yellow-900"}`}>
                         <Clock className="h-4 w-4" />
-                        Pending {medication.pendingRequest.requestType === "remove" ? "Removal" : "Change"} Request
+                        Pending {medication.pendingRequest.requestType === "remove" ? "Removal" : medication.isPendingAddition ? "Addition" : "Change"} Request
                       </p>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                         <div>
