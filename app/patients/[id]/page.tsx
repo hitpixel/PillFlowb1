@@ -16,6 +16,20 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { Id } from "@/convex/_generated/dataModel";
+import { AppSidebar } from "@/components/app-sidebar";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 
 export default function PatientDetailPage() {
   const params = useParams();
@@ -255,26 +269,59 @@ export default function PatientDetailPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/patients">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Patients
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <User className="h-8 w-8" />
-              {patient.firstName} {patient.lastName}
-            </h1>
-            <p className="text-muted-foreground">
-              Patient details and medical information
-            </p>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+          <div className="flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-[orientation=vertical]:h-4"
+            />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem className="hidden md:block">
+                  <BreadcrumbLink href="/dashboard">
+                    Dashboard
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/patients">
+                    Patients
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>{patient.firstName} {patient.lastName}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
           </div>
-        </div>
+        </header>
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <div className="max-w-4xl mx-auto space-y-6 w-full">
+            {/* Header */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Link href="/patients">
+                    <Button variant="ghost" size="sm">
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back to Patients
+                    </Button>
+                  </Link>
+                  <div>
+                    <h1 className="text-3xl font-bold flex items-center gap-2">
+                      <User className="h-8 w-8" />
+                      {patient.firstName} {patient.lastName}
+                    </h1>
+                    <p className="text-muted-foreground">
+                      Patient details and medical information
+                    </p>
+                  </div>
+                </div>
         
         <div className="flex items-center gap-2">
           {!isEditing ? (
@@ -304,10 +351,11 @@ export default function PatientDetailPage() {
             </Button>
           )}
         </div>
-      </div>
+              </div>
+            </div>
 
-      {/* Patient Information */}
-      <Card>
+            {/* Patient Information */}
+            <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Patient Information</span>
@@ -576,6 +624,9 @@ export default function PatientDetailPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+          </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 } 
