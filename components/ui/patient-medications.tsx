@@ -399,39 +399,48 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Dialog 
-                      open={editingMedication?._id === medication._id} 
-                      onOpenChange={(open) => {
-                        if (!open) {
-                          setEditingMedication(null);
-                        }
-                      }}
-                    >
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={() => setEditingMedication(medication)}>
-                          <Edit className="h-3 w-3 mr-1" />
-                          Edit
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle>Edit Medication</DialogTitle>
-                          <DialogDescription>
-                            Update medication details
-                          </DialogDescription>
-                        </DialogHeader>
-                        <MedicationForm
-                          initialData={getEditInitialData(medication)}
-                          onSubmit={handleEditMedication}
-                          onRequestChange={handleRequestChange}
-                          onCancel={() => setEditingMedication(null)}
-                          isLoading={isSubmitting}
-                          isEdit={true}
-                          isSharedAccess={isSharedAccess(medication)}
-                          canRequestRemoval={true}
-                        />
-                      </DialogContent>
-                    </Dialog>
+                    <>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingMedication(medication);
+                        }}
+                      >
+                        <Edit className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                      {editingMedication?._id === medication._id && (
+                        <Dialog 
+                          open={true}
+                          onOpenChange={(open) => {
+                            if (!open) {
+                              setEditingMedication(null);
+                            }
+                          }}
+                        >
+                          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                            <DialogHeader>
+                              <DialogTitle>Edit Medication</DialogTitle>
+                              <DialogDescription>
+                                Update medication details
+                              </DialogDescription>
+                            </DialogHeader>
+                            <MedicationForm
+                              initialData={getEditInitialData(medication)}
+                              onSubmit={handleEditMedication}
+                              onRequestChange={handleRequestChange}
+                              onCancel={() => setEditingMedication(null)}
+                              isLoading={isSubmitting}
+                              isEdit={true}
+                              isSharedAccess={isSharedAccess(medication)}
+                              canRequestRemoval={true}
+                            />
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                    </>
                     {medication.hasPendingRequest && medication.pendingRequest && !isSharedAccess(medication) && (
                       <div className="flex items-center gap-2">
                         <Button 
