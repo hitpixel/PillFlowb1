@@ -102,7 +102,7 @@ const DialogContent: React.FC<DialogContentProps> = ({
       {/* Content */}
       <div
         className={cn(
-          "relative z-50 w-full max-w-lg mx-4 bg-white rounded-lg shadow-lg border",
+          "relative z-50 w-full max-w-lg mx-4 bg-white rounded-lg shadow-lg border p-6",
           className
         )}
         {...props}
@@ -110,7 +110,7 @@ const DialogContent: React.FC<DialogContentProps> = ({
         <Button
           variant="ghost"
           size="sm"
-          className="absolute right-4 top-4 rounded-sm opacity-70 hover:opacity-100"
+          className="absolute right-2 top-2 rounded-sm opacity-70 hover:opacity-100"
           onClick={() => onOpenChange(false)}
         >
           <X className="h-4 w-4" />
@@ -127,7 +127,7 @@ const DialogHeader: React.FC<DialogHeaderProps> = ({
   ...props 
 }) => (
   <div
-    className={cn("flex flex-col space-y-1.5 text-center sm:text-left p-6 pb-2", className)}
+    className={cn("flex flex-col space-y-1.5 text-center sm:text-left pb-4", className)}
     {...props}
   >
     {children}
@@ -165,7 +165,7 @@ const DialogFooter: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   ...props 
 }) => (
   <div
-    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 p-6 pt-2", className)}
+    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 pt-4", className)}
     {...props}
   />
 );

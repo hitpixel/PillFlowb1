@@ -57,39 +57,49 @@ export function ShareTokenModal({ triggerButton, onTokenSubmit }: ShareTokenModa
       <DialogTrigger asChild>
         {triggerButton || defaultTrigger}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Share2 className="h-5 w-5" />
+      <DialogContent className="sm:max-w-lg w-full max-w-[90vw]">
+        <DialogHeader className="pb-6">
+          <DialogTitle className="flex items-center gap-3 text-xl">
+            <Share2 className="h-6 w-6" />
             Access Shared Patient
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-base mt-3">
             Enter a share token to access patient data from another organization
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="shareToken">Share Token</Label>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <Label htmlFor="shareToken" className="text-sm font-medium">
+              Share Token
+            </Label>
             <Input
               id="shareToken"
               placeholder="PAT-XXXX-XXXX-XXXX"
               value={shareToken}
               onChange={(e) => setShareToken(e.target.value)}
               disabled={isSearching}
+              className="h-11 text-base"
             />
-            <p className="text-sm text-muted-foreground">
-              Share tokens look like: PAT-ABCD-1234-EFGH
-            </p>
+            <div className="bg-muted/50 rounded-md p-3">
+              <p className="text-sm text-muted-foreground">
+                <strong>Format:</strong> Share tokens look like: PAT-ABCD-1234-EFGH
+              </p>
+            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-3 pt-4">
             <Button 
               type="button" 
               variant="outline" 
               onClick={() => setOpen(false)}
+              className="h-10 px-6"
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!shareToken.trim() || isSearching}>
+            <Button 
+              type="submit" 
+              disabled={!shareToken.trim() || isSearching}
+              className="h-10 px-6"
+            >
               {isSearching ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
