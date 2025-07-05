@@ -48,10 +48,11 @@ export function PatientComments({ patientId }: PatientCommentsProps) {
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Query for comments
+  // Query for comments and current user
   const comments = useQuery(api.patientManagement.getPatientComments, {
     patientId: patientId as any,
   });
+  const currentUser = useQuery(api.users.getCurrentUserProfile);
 
   // Mutation
   const addComment = useMutation(api.patientManagement.addPatientComment);
@@ -202,58 +203,64 @@ export function PatientComments({ patientId }: PatientCommentsProps) {
 
                   {/* Comments for this date */}
                   <div className="space-y-3">
-                    {(dayComments as any[]).map((comment: any) => (
-                      <div key={comment._id} className="flex gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-xs">
-                            {getUserInitials(comment.author?.firstName, comment.author?.lastName)}
-                          </AvatarFallback>
-                        </Avatar>
-                        
-                        <div className="flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">
-                              {comment.author?.firstName} {comment.author?.lastName}
-                            </span>
-                            <Badge variant="outline" className="text-xs">
-                              <Building2 className="h-3 w-3 mr-1" />
-                              {comment.authorOrg?.name}
-                            </Badge>
-                            <Badge className={`text-xs ${getCommentTypeColor(comment.commentType)}`}>
-                              {getCommentIcon(comment.commentType)}
-                              <span className="ml-1 capitalize">{comment.commentType}</span>
-                            </Badge>
-                            {comment.isPrivate && (
-                              <Badge variant="secondary" className="text-xs">
-                                <Lock className="h-3 w-3 mr-1" />
-                                Private
+                    {(dayComments as any[]).map((comment: any) => {
+                      const isCurrentUser = currentUser && comment.authorId === currentUser._id;
+                      
+                      return (
+                        <div key={comment._id} className={`flex gap-3 ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="text-xs">
+                              {getUserInitials(comment.author?.firstName, comment.author?.lastName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          
+                          <div className={`flex-1 space-y-1 ${isCurrentUser ? 'items-end' : ''}`}>
+                            <div className={`flex items-center gap-2 ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
+                              <span className="font-medium text-sm">
+                                {isCurrentUser ? 'You' : `${comment.author?.firstName} ${comment.author?.lastName}`}
+                              </span>
+                              <Badge variant="outline" className="text-xs">
+                                <Building2 className="h-3 w-3 mr-1" />
+                                {comment.authorOrg?.name}
                               </Badge>
-                            )}
-                            <span className="text-xs text-muted-foreground">
-                              {formatMessageTime(comment.createdAt)}
-                            </span>
-                          </div>
+                              <Badge className={`text-xs ${getCommentTypeColor(comment.commentType)}`}>
+                                {getCommentIcon(comment.commentType)}
+                                <span className="ml-1 capitalize">{comment.commentType}</span>
+                              </Badge>
+                              {comment.isPrivate && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <Lock className="h-3 w-3 mr-1" />
+                                  Private
+                                </Badge>
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {formatMessageTime(comment.createdAt)}
+                              </span>
+                            </div>
 
-                          <div className="bg-muted/50 rounded-lg p-3">
-                            <p className="text-sm">{comment.content}</p>
-                          </div>
+                            <div className={`rounded-lg p-3 max-w-[70%] ${isCurrentUser ? 'ml-auto' : ''} ${
+                              isCurrentUser ? 'bg-blue-500 text-white' : 'bg-muted/50'
+                            }`}>
+                              <p className="text-sm">{comment.content}</p>
+                            </div>
 
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 text-xs"
-                              onClick={() => handleReply(comment)}
-                            >
-                              Reply
-                            </Button>
-                            <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
-                            </span>
+                            <div className={`flex items-center gap-2 ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs"
+                                onClick={() => handleReply(comment)}
+                              >
+                                Reply
+                              </Button>
+                              <span className="text-xs text-muted-foreground">
+                                {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}

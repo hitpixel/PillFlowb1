@@ -795,7 +795,7 @@ export const getPatientComments = query({
       .query("patientComments")
       .withIndex("by_patient", (q) => q.eq("patientId", args.patientId))
       .filter((q) => q.eq(q.field("isActive"), true))
-      .order("desc")
+      .order("asc")
       .collect();
 
     // Filter out private comments if user is from different org
