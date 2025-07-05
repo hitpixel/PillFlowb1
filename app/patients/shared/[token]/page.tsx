@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, User, Calendar, Mail, Phone, MapPin, Package, Share2, Building2, Info } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, User, Calendar, Mail, Phone, MapPin, Package, Share2, Building2, Info, Pill, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -25,6 +26,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { PatientMedications } from "@/components/ui/patient-medications";
+import { PatientComments } from "@/components/ui/patient-comments";
 
 export default function SharedPatientPage() {
   const params = useParams();
@@ -215,25 +218,43 @@ export default function SharedPatientPage() {
               </AlertDescription>
             </Alert>
 
-            {/* Patient Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Patient Information</span>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">
-                      Age {formatAge(patient.dateOfBirth)}
-                    </Badge>
-                    <Badge variant={patient.preferredPack === "blister" ? "default" : "outline"}>
-                      {patient.preferredPack === "blister" ? "Blister Pack" : "Sachets"}
-                    </Badge>
-                  </div>
-                </CardTitle>
-                <CardDescription>
-                  Patient details shared via token: {shareToken}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+            {/* Patient Information Tabs */}
+            <Tabs defaultValue="patient-info" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="patient-info" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Patient Info
+                </TabsTrigger>
+                <TabsTrigger value="medications" className="flex items-center gap-2">
+                  <Pill className="h-4 w-4" />
+                  Medications
+                </TabsTrigger>
+                <TabsTrigger value="communication" className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Communication
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Patient Info Tab */}
+              <TabsContent value="patient-info" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>Patient Information</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">
+                          Age {formatAge(patient.dateOfBirth)}
+                        </Badge>
+                        <Badge variant={patient.preferredPack === "blister" ? "default" : "outline"}>
+                          {patient.preferredPack === "blister" ? "Blister Pack" : "Sachets"}
+                        </Badge>
+                      </div>
+                    </CardTitle>
+                    <CardDescription>
+                      Patient details shared via token: {shareToken}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
                 <div className="space-y-6">
                   {/* Personal Information */}
                   <div>
@@ -318,8 +339,20 @@ export default function SharedPatientPage() {
                     </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Medications Tab */}
+              <TabsContent value="medications" className="space-y-4">
+                <PatientMedications patientId={patient._id} />
+              </TabsContent>
+
+              {/* Communication Tab */}
+              <TabsContent value="communication" className="space-y-4">
+                <PatientComments patientId={patient._id} />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </SidebarInset>

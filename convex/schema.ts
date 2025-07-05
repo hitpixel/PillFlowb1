@@ -172,4 +172,87 @@ export default defineSchema({
     .index("by_share_token", ["shareToken"])
     .index("by_access_time", ["accessedAt"]),
 
+  // Token access grants - who has ongoing access to patient data
+  tokenAccessGrants: defineTable({
+    patientId: v.id("patients"),
+    shareToken: v.string(),
+    grantedTo: v.id("userProfiles"),
+    grantedToOrg: v.id("organizations"),
+    grantedBy: v.id("userProfiles"),
+    grantedByOrg: v.id("organizations"),
+    accessType: v.union(
+      v.literal("same_organization"),
+      v.literal("cross_organization")
+    ),
+    permissions: v.array(v.union(
+      v.literal("view"),
+      v.literal("comment"),
+      v.literal("view_medications")
+    )),
+    expiresAt: v.optional(v.float64()), // null means never expires
+    isActive: v.boolean(),
+    grantedAt: v.float64(),
+    revokedAt: v.optional(v.float64()),
+    revokedBy: v.optional(v.id("userProfiles")),
+  })
+    .index("by_patient", ["patientId"])
+    .index("by_grantee", ["grantedTo"])
+    .index("by_share_token", ["shareToken"])
+    .index("by_expiry", ["expiresAt"])
+    .index("by_active", ["isActive"]),
+
+  // Patient medications
+  patientMedications: defineTable({
+    patientId: v.id("patients"),
+    organizationId: v.id("organizations"), // Which org added this medication
+    medicationName: v.string(),
+    dosage: v.string(),
+    frequency: v.string(),
+    instructions: v.optional(v.string()),
+    prescribedBy: v.optional(v.string()), // Doctor name
+    prescribedDate: v.optional(v.string()), // YYYY-MM-DD format
+    startDate: v.optional(v.string()), // YYYY-MM-DD format
+    endDate: v.optional(v.string()), // YYYY-MM-DD format
+    isActive: v.boolean(),
+    addedBy: v.id("userProfiles"),
+    addedAt: v.float64(),
+    updatedBy: v.optional(v.id("userProfiles")),
+    updatedAt: v.optional(v.float64()),
+  })
+    .index("by_patient", ["patientId"])
+    .index("by_organization", ["organizationId"])
+    .index("by_active", ["isActive"])
+    .index("by_added_by", ["addedBy"]),
+
+  // Patient comments/chat system
+  patientComments: defineTable({
+    patientId: v.id("patients"),
+    authorId: v.id("userProfiles"),
+    authorOrg: v.id("organizations"),
+    content: v.string(),
+    commentType: v.union(
+      v.literal("note"),
+      v.literal("chat"),
+      v.literal("system")
+    ),
+    isPrivate: v.boolean(), // Private to organization or shared with token holders
+    replyToId: v.optional(v.id("patientComments")), // For threaded conversations
+    attachments: v.optional(v.array(v.object({
+      fileName: v.string(),
+      fileUrl: v.string(),
+      fileType: v.string(),
+      fileSize: v.number(),
+    }))),
+    isActive: v.boolean(),
+    createdAt: v.float64(),
+    updatedAt: v.optional(v.float64()),
+    editedBy: v.optional(v.id("userProfiles")),
+  })
+    .index("by_patient", ["patientId"])
+    .index("by_author", ["authorId"])
+    .index("by_author_org", ["authorOrg"])
+    .index("by_reply_to", ["replyToId"])
+    .index("by_created_at", ["createdAt"])
+    .index("by_active", ["isActive"]),
+
 });

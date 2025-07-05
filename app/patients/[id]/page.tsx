@@ -11,7 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Edit, Save, X, Trash2, Copy, User, Calendar, Mail, Phone, MapPin, Package, Share2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Edit, Save, X, Trash2, Copy, User, Calendar, Mail, Phone, MapPin, Package, Share2, Shield, Pill, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
@@ -30,6 +31,9 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { TokenAccessManagement } from "@/components/ui/token-access-management";
+import { PatientMedications } from "@/components/ui/patient-medications";
+import { PatientComments } from "@/components/ui/patient-comments";
 
 export default function PatientDetailPage() {
   const params = useParams();
@@ -354,22 +358,44 @@ export default function PatientDetailPage() {
               </div>
             </div>
 
-            {/* Patient Information */}
-            <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Patient Information</span>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">
-                Age {formatAge(patient.dateOfBirth)}
-              </Badge>
-              <Badge variant={patient.preferredPack === "blister" ? "default" : "outline"}>
-                {patient.preferredPack === "blister" ? "Blister Pack" : "Sachets"}
-              </Badge>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+            {/* Patient Information Tabs */}
+            <Tabs defaultValue="patient-info" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="patient-info" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Patient Info
+                </TabsTrigger>
+                <TabsTrigger value="token-access" className="flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Token Access
+                </TabsTrigger>
+                <TabsTrigger value="medications" className="flex items-center gap-2">
+                  <Pill className="h-4 w-4" />
+                  Medications
+                </TabsTrigger>
+                <TabsTrigger value="communication" className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Communication
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Patient Info Tab */}
+              <TabsContent value="patient-info" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>Patient Information</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">
+                          Age {formatAge(patient.dateOfBirth)}
+                        </Badge>
+                        <Badge variant={patient.preferredPack === "blister" ? "default" : "outline"}>
+                          {patient.preferredPack === "blister" ? "Blister Pack" : "Sachets"}
+                        </Badge>
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
           {!isEditing ? (
             <div className="space-y-6">
               {/* Personal Information */}
@@ -622,8 +648,25 @@ export default function PatientDetailPage() {
               </div>
             </form>
           )}
-        </CardContent>
-      </Card>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Token Access Tab */}
+              <TabsContent value="token-access" className="space-y-4">
+                <TokenAccessManagement patientId={patientId} />
+              </TabsContent>
+
+              {/* Medications Tab */}
+              <TabsContent value="medications" className="space-y-4">
+                <PatientMedications patientId={patientId} />
+              </TabsContent>
+
+              {/* Communication Tab */}
+              <TabsContent value="communication" className="space-y-4">
+                <PatientComments patientId={patientId} />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </SidebarInset>
