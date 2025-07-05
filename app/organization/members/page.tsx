@@ -92,6 +92,7 @@ export default function OrganizationMembersPage() {
   const createInvitation = useMutation(api.users.createMemberInvitation);
   const updateMemberRole = useMutation(api.users.updateMemberRole);
   const removeMember = useMutation(api.users.removeMember);
+  const cancelInvitation = useMutation(api.users.cancelInvitation);
   
   // State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -197,6 +198,20 @@ export default function OrganizationMembersPage() {
       setTimeout(() => setSuccess(null), 3000);
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Failed to remove member");
+    }
+  };
+
+  const handleCancelInvitation = async (invitationId: string) => {
+    if (!confirm("Are you sure you want to cancel this invitation?")) {
+      return;
+    }
+    
+    try {
+      await cancelInvitation({ invitationId: invitationId as Id<"memberInvitations"> });
+      setSuccess("Invitation canceled successfully!");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Failed to cancel invitation");
     }
   };
 
@@ -432,8 +447,18 @@ export default function OrganizationMembersPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => copyToClipboard(invitation.inviteToken)}
+                        title="Copy invitation token"
                       >
                         <Copy className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleCancelInvitation(invitation._id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Cancel invitation"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>
