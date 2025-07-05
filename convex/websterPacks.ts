@@ -296,6 +296,122 @@ export const searchPatientsForWebsterCheck = query({
   },
 });
 
+// Get patient medications organized by time of day for Webster pack verification
+export const getPatientMedicationsByTime = query({
+  args: {
+    patientId: v.id("patients"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization");
+    }
+
+    // Get organization to verify it's a pharmacy
+    const organization = await ctx.db.get(userProfile.organizationId);
+    if (!organization || organization.type !== "pharmacy") {
+      throw new Error("Webster pack checking is only available to pharmacy organizations");
+    }
+
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Access denied: You don't have permission to view medications for this patient");
+    }
+
+    // Get active medications for the patient
+    const medications = await ctx.db
+      .query("patientMedications")
+      .withIndex("by_patient", (q) => q.eq("patientId", args.patientId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    // Organize medications by time of day
+    const medicationsByTime = {
+      morning: [] as any[],
+      afternoon: [] as any[],
+      evening: [] as any[],
+      night: [] as any[],
+    };
+
+    medications.forEach(med => {
+      const medInfo = {
+        _id: med._id,
+        medicationName: med.medicationName,
+        dosage: med.dosage,
+        instructions: med.instructions,
+        prescribedBy: med.prescribedBy,
+        brandName: med.brandName,
+        genericName: med.genericName,
+        activeIngredient: med.activeIngredient,
+        strength: med.strength,
+      };
+
+      // Add to appropriate time slots based on dosing schedule
+      if (med.morningDose && med.morningDose.trim() !== "") {
+        medicationsByTime.morning.push({
+          ...medInfo,
+          dose: med.morningDose,
+          time: "Morning",
+        });
+      }
+      
+      if (med.afternoonDose && med.afternoonDose.trim() !== "") {
+        medicationsByTime.afternoon.push({
+          ...medInfo,
+          dose: med.afternoonDose,
+          time: "Afternoon",
+        });
+      }
+      
+      if (med.eveningDose && med.eveningDose.trim() !== "") {
+        medicationsByTime.evening.push({
+          ...medInfo,
+          dose: med.eveningDose,
+          time: "Evening",
+        });
+      }
+      
+      if (med.nightDose && med.nightDose.trim() !== "") {
+        medicationsByTime.night.push({
+          ...medInfo,
+          dose: med.nightDose,
+          time: "Night",
+        });
+      }
+    });
+
+    // Calculate totals
+    const totalMedications = medications.length;
+    const totalDoses = medicationsByTime.morning.length + 
+                      medicationsByTime.afternoon.length + 
+                      medicationsByTime.evening.length + 
+                      medicationsByTime.night.length;
+
+    return {
+      medicationsByTime,
+      totalMedications,
+      totalDoses,
+      summary: {
+        morning: medicationsByTime.morning.length,
+        afternoon: medicationsByTime.afternoon.length,
+        evening: medicationsByTime.evening.length,
+        night: medicationsByTime.night.length,
+      },
+    };
+  },
+});
+
 // Get Webster pack check statistics
 export const getWebsterCheckStats = query({
   args: {},

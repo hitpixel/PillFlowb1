@@ -58,20 +58,29 @@ export default function WebsterPacksPage() {
   // Mutations
   const createCheck = useMutation(api.websterPacks.createWebsterPackCheck);
   
-  // Form state
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedPatient, setSelectedPatient] = useState<SelectedPatient | null>(null);
+  // Multi-step form state
+  const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
+    // Step 1: Patient & Pack Details
     websterPackId: "",
     packType: "blister" as "blister" | "sachets",
+    
+    // Step 2: Medication Verification
+    medicationVerified: false,
+    
+    // Step 3: Final Check
     checkStatus: "passed" as "passed" | "failed" | "requires_review",
     notes: "",
+    issues: [] as string[],
     medicationCount: "",
     packWeight: "",
     batchNumber: "",
     expiryDate: "",
   });
-  const [issues, setIssues] = useState<string[]>([]);
+  
+  // Form state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedPatient, setSelectedPatient] = useState<SelectedPatient | null>(null);
   const [newIssue, setNewIssue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
@@ -79,6 +88,12 @@ export default function WebsterPacksPage() {
   const patientSearchResults = useQuery(
     api.websterPacks.searchPatientsForWebsterCheck,
     searchTerm.trim() ? { searchTerm: searchTerm.trim(), limit: 10 } : "skip"
+  );
+
+  // Get patient medications by time (for step 2)
+  const patientMedications = useQuery(
+    api.websterPacks.getPatientMedicationsByTime,
+    selectedPatient && currentStep >= 2 ? { patientId: selectedPatient._id } : "skip"
   );
 
   // Check if user has access (pharmacy organizations only)
@@ -95,14 +110,20 @@ export default function WebsterPacksPage() {
   };
 
   const handleAddIssue = () => {
-    if (newIssue.trim() && !issues.includes(newIssue.trim())) {
-      setIssues([...issues, newIssue.trim()]);
+    if (newIssue.trim() && !formData.issues.includes(newIssue.trim())) {
+      setFormData(prev => ({
+        ...prev,
+        issues: [...prev.issues, newIssue.trim()]
+      }));
       setNewIssue("");
     }
   };
 
   const handleRemoveIssue = (index: number) => {
-    setIssues(issues.filter((_, i) => i !== index));
+    setFormData(prev => ({
+      ...prev,
+      issues: prev.issues.filter((_, i) => i !== index)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,7 +148,7 @@ export default function WebsterPacksPage() {
         packType: formData.packType,
         checkStatus: formData.checkStatus,
         notes: formData.notes.trim() || undefined,
-        issues: issues.length > 0 ? issues : undefined,
+        issues: formData.issues.length > 0 ? formData.issues : undefined,
         medicationCount: formData.medicationCount ? parseInt(formData.medicationCount) : undefined,
         packWeight: formData.packWeight ? parseFloat(formData.packWeight) : undefined,
         batchNumber: formData.batchNumber.trim() || undefined,
@@ -140,17 +161,19 @@ export default function WebsterPacksPage() {
       
       // Reset form
       setSelectedPatient(null);
+      setCurrentStep(1);
       setFormData({
         websterPackId: "",
         packType: "blister",
+        medicationVerified: false,
         checkStatus: "passed",
         notes: "",
+        issues: [],
         medicationCount: "",
         packWeight: "",
         batchNumber: "",
         expiryDate: "",
       });
-      setIssues([]);
       
     } catch (error) {
       console.error("Error creating Webster pack check:", error);
@@ -302,240 +325,477 @@ export default function WebsterPacksPage() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Webster Pack Check Form */}
+              {/* Multi-Step Webster Pack Check Form */}
               <div className="lg:col-span-2">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Record Pack Check</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      <span>Pack Check Verification</span>
+                      <Badge variant="outline">Step {currentStep} of 3</Badge>
+                    </CardTitle>
                     <CardDescription>
-                      Search for a patient and record Webster pack verification details
+                      {currentStep === 1 && "Search for a patient and enter pack details"}
+                      {currentStep === 2 && "Verify patient medication schedule"}
+                      {currentStep === 3 && "Final confirmation and quality check"}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                      {/* Patient Search */}
-                      <div className="space-y-2">
-                        <Label htmlFor="patient-search">Search Patient</Label>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="patient-search"
-                            placeholder="Search by name or share token..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10"
-                          />
+                    {/* Progress Steps */}
+                    <div className="mb-8">
+                      <div className="flex items-center justify-between">
+                        <div className={`flex items-center gap-2 ${currentStep >= 1 ? 'text-blue-600' : 'text-gray-400'}`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                            currentStep >= 1 ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
+                          }`}>
+                            1
+                          </div>
+                          <span className="font-medium">Patient & Pack</span>
                         </div>
-                        
-                        {/* Patient Search Results */}
-                        {patientSearchResults && patientSearchResults.length > 0 && searchTerm && (
-                          <div className="border rounded-md bg-white shadow-sm max-h-60 overflow-y-auto">
-                            {patientSearchResults.map((patient) => (
-                              <button
-                                key={patient._id}
-                                type="button"
-                                onClick={() => handlePatientSelect(patient)}
-                                className="w-full px-3 py-2 text-left hover:bg-gray-50 border-b last:border-b-0 focus:outline-none focus:bg-gray-50"
-                              >
-                                <div className="font-medium">{patient.name}</div>
-                                <div className="text-sm text-muted-foreground">
-                                  {patient.shareToken} • Prefers {patient.preferredPack}
-                                </div>
-                              </button>
-                            ))}
+                        <div className={`flex-1 h-0.5 mx-4 ${currentStep >= 2 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+                        <div className={`flex items-center gap-2 ${currentStep >= 2 ? 'text-blue-600' : 'text-gray-400'}`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                            currentStep >= 2 ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
+                          }`}>
+                            2
                           </div>
-                        )}
-                        
-                        {/* Selected Patient */}
-                        {selectedPatient && (
-                          <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                            <User className="h-4 w-4 text-blue-600" />
-                            <span className="font-medium">{selectedPatient.name}</span>
-                            <Badge variant="outline">{selectedPatient.shareToken}</Badge>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSelectedPatient(null)}
-                            >
-                              Change
-                            </Button>
+                          <span className="font-medium">Medication Check</span>
+                        </div>
+                        <div className={`flex-1 h-0.5 mx-4 ${currentStep >= 3 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
+                        <div className={`flex items-center gap-2 ${currentStep >= 3 ? 'text-blue-600' : 'text-gray-400'}`}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                            currentStep >= 3 ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
+                          }`}>
+                            3
                           </div>
-                        )}
+                          <span className="font-medium">Final Check</span>
+                        </div>
                       </div>
+                    </div>
 
-                      <Separator />
-
-                      {/* Pack Details */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Step 1: Patient & Pack Details */}
+                    {currentStep === 1 && (
+                      <div className="space-y-6">
+                        {/* Patient Search */}
                         <div className="space-y-2">
-                          <Label htmlFor="webster-pack-id">Webster Pack ID *</Label>
-                          <Input
-                            id="webster-pack-id"
-                            value={formData.websterPackId}
-                            onChange={(e) => setFormData({...formData, websterPackId: e.target.value})}
-                            placeholder="Enter pack barcode/ID"
-                            required
-                          />
+                          <Label htmlFor="patient-search">Search Patient</Label>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="patient-search"
+                              placeholder="Search by name or share token..."
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                              className="pl-10"
+                            />
+                          </div>
+                          
+                          {/* Patient Search Results */}
+                          {patientSearchResults && patientSearchResults.length > 0 && searchTerm && (
+                            <div className="border rounded-md bg-white shadow-sm max-h-60 overflow-y-auto">
+                              {patientSearchResults.map((patient) => (
+                                <button
+                                  key={patient._id}
+                                  type="button"
+                                  onClick={() => handlePatientSelect(patient)}
+                                  className="w-full px-3 py-2 text-left hover:bg-gray-50 border-b last:border-b-0 focus:outline-none focus:bg-gray-50"
+                                >
+                                  <div className="font-medium">{patient.name}</div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {patient.shareToken} • Prefers {patient.preferredPack}
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Selected Patient */}
+                          {selectedPatient && (
+                            <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                              <User className="h-4 w-4 text-blue-600" />
+                              <span className="font-medium">{selectedPatient.name}</span>
+                              <Badge variant="outline">{selectedPatient.shareToken}</Badge>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSelectedPatient(null)}
+                              >
+                                Change
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                        
+
+                        <Separator />
+
+                        {/* Pack Details */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="webster-pack-id">Webster Pack ID *</Label>
+                            <Input
+                              id="webster-pack-id"
+                              value={formData.websterPackId}
+                              onChange={(e) => setFormData({...formData, websterPackId: e.target.value})}
+                              placeholder="Enter pack barcode/ID"
+                              required
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="pack-type">Pack Type</Label>
+                            <Select 
+                              value={formData.packType} 
+                              onValueChange={(value) => setFormData({...formData, packType: value as "blister" | "sachets"})}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="blister">Blister Pack</SelectItem>
+                                <SelectItem value="sachets">Sachets</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        {/* Next Button */}
+                        <div className="flex justify-end pt-4">
+                          <Button 
+                            type="button"
+                            onClick={() => setCurrentStep(2)}
+                            disabled={!selectedPatient || !formData.websterPackId.trim()}
+                            className="min-w-32"
+                          >
+                            Next Step
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 2: Medication Verification */}
+                    {currentStep === 2 && selectedPatient && (
+                      <div className="space-y-6">
+                        <div className="bg-blue-50 p-4 rounded-lg">
+                          <h3 className="font-medium text-blue-900 mb-2">Medication Schedule Verification</h3>
+                          <p className="text-sm text-blue-700">
+                            Please verify the medications below match what&apos;s in the Webster pack for{" "}
+                            <strong>{selectedPatient.name}</strong>
+                          </p>
+                        </div>
+
+                        {patientMedications && (
+                          <div className="space-y-4">
+                            {/* Morning Medications */}
+                            {patientMedications.medicationsByTime.morning.length > 0 && (
+                              <div className="border rounded-lg p-4">
+                                <h4 className="font-medium text-yellow-600 mb-3 flex items-center gap-2">
+                                  <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                                  Morning ({patientMedications.medicationsByTime.morning.length} medications)
+                                </h4>
+                                <div className="space-y-2">
+                                  {patientMedications.medicationsByTime.morning.map((med, index) => (
+                                    <div key={index} className="flex items-center justify-between p-2 bg-yellow-50 rounded">
+                                      <div>
+                                        <div className="font-medium">{med.medicationName}</div>
+                                        <div className="text-sm text-gray-600">{med.dose}</div>
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {med.strength && `${med.strength} • `}
+                                        {med.dosage}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Afternoon Medications */}
+                            {patientMedications.medicationsByTime.afternoon.length > 0 && (
+                              <div className="border rounded-lg p-4">
+                                <h4 className="font-medium text-orange-600 mb-3 flex items-center gap-2">
+                                  <div className="w-3 h-3 bg-orange-400 rounded-full"></div>
+                                  Afternoon ({patientMedications.medicationsByTime.afternoon.length} medications)
+                                </h4>
+                                <div className="space-y-2">
+                                  {patientMedications.medicationsByTime.afternoon.map((med, index) => (
+                                    <div key={index} className="flex items-center justify-between p-2 bg-orange-50 rounded">
+                                      <div>
+                                        <div className="font-medium">{med.medicationName}</div>
+                                        <div className="text-sm text-gray-600">{med.dose}</div>
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {med.strength && `${med.strength} • `}
+                                        {med.dosage}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Evening Medications */}
+                            {patientMedications.medicationsByTime.evening.length > 0 && (
+                              <div className="border rounded-lg p-4">
+                                <h4 className="font-medium text-purple-600 mb-3 flex items-center gap-2">
+                                  <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
+                                  Evening ({patientMedications.medicationsByTime.evening.length} medications)
+                                </h4>
+                                <div className="space-y-2">
+                                  {patientMedications.medicationsByTime.evening.map((med, index) => (
+                                    <div key={index} className="flex items-center justify-between p-2 bg-purple-50 rounded">
+                                      <div>
+                                        <div className="font-medium">{med.medicationName}</div>
+                                        <div className="text-sm text-gray-600">{med.dose}</div>
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {med.strength && `${med.strength} • `}
+                                        {med.dosage}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Night Medications */}
+                            {patientMedications.medicationsByTime.night.length > 0 && (
+                              <div className="border rounded-lg p-4">
+                                <h4 className="font-medium text-indigo-600 mb-3 flex items-center gap-2">
+                                  <div className="w-3 h-3 bg-indigo-400 rounded-full"></div>
+                                  Night ({patientMedications.medicationsByTime.night.length} medications)
+                                </h4>
+                                <div className="space-y-2">
+                                  {patientMedications.medicationsByTime.night.map((med, index) => (
+                                    <div key={index} className="flex items-center justify-between p-2 bg-indigo-50 rounded">
+                                      <div>
+                                        <div className="font-medium">{med.medicationName}</div>
+                                        <div className="text-sm text-gray-600">{med.dose}</div>
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {med.strength && `${med.strength} • `}
+                                        {med.dosage}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Summary */}
+                            <div className="bg-gray-50 p-4 rounded-lg">
+                              <h4 className="font-medium mb-2">Medication Summary</h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div>
+                                  <div className="font-medium">Total Medications</div>
+                                  <div className="text-2xl font-bold text-blue-600">{patientMedications.totalMedications}</div>
+                                </div>
+                                <div>
+                                  <div className="font-medium">Total Doses</div>
+                                  <div className="text-2xl font-bold text-green-600">{patientMedications.totalDoses}</div>
+                                </div>
+                                <div>
+                                  <div className="font-medium">Pack Type</div>
+                                  <div className="text-lg font-medium capitalize">{formData.packType}</div>
+                                </div>
+                                <div>
+                                  <div className="font-medium">Pack ID</div>
+                                  <div className="text-lg font-medium">{formData.websterPackId}</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Navigation Buttons */}
+                        <div className="flex justify-between pt-4">
+                          <Button 
+                            type="button"
+                            variant="outline"
+                            onClick={() => setCurrentStep(1)}
+                            className="min-w-32"
+                          >
+                            Back
+                          </Button>
+                          <Button 
+                            type="button"
+                            onClick={() => {
+                              setFormData({...formData, medicationVerified: true});
+                              setCurrentStep(3);
+                            }}
+                            className="min-w-32"
+                          >
+                            Medications Verified
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Step 3: Final Check */}
+                    {currentStep === 3 && selectedPatient && (
+                      <div className="space-y-6">
+                        <div className="bg-green-50 p-4 rounded-lg">
+                          <h3 className="font-medium text-green-900 mb-2">Final Pack Verification</h3>
+                          <p className="text-sm text-green-700">
+                            Complete the quality check for Webster pack <strong>{formData.websterPackId}</strong>
+                          </p>
+                        </div>
+
+                        {/* Check Status */}
                         <div className="space-y-2">
-                          <Label htmlFor="pack-type">Pack Type</Label>
+                          <Label htmlFor="check-status">Check Status</Label>
                           <Select 
-                            value={formData.packType} 
-                            onValueChange={(value) => setFormData({...formData, packType: value as "blister" | "sachets"})}
+                            value={formData.checkStatus} 
+                            onValueChange={(value) => setFormData({...formData, checkStatus: value as "passed" | "failed" | "requires_review"})}
                           >
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="blister">Blister Pack</SelectItem>
-                              <SelectItem value="sachets">Sachets</SelectItem>
+                              <SelectItem value="passed">
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                  Passed
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="requires_review">
+                                <div className="flex items-center gap-2">
+                                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                                  Requires Review
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="failed">
+                                <div className="flex items-center gap-2">
+                                  <XCircle className="h-4 w-4 text-red-600" />
+                                  Failed
+                                </div>
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-                      </div>
 
-                      {/* Check Status */}
-                      <div className="space-y-2">
-                        <Label htmlFor="check-status">Check Status</Label>
-                        <Select 
-                          value={formData.checkStatus} 
-                          onValueChange={(value) => setFormData({...formData, checkStatus: value as "passed" | "failed" | "requires_review"})}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="passed">
-                              <div className="flex items-center gap-2">
-                                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                Passed
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="requires_review">
-                              <div className="flex items-center gap-2">
-                                <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                                Requires Review
-                              </div>
-                            </SelectItem>
-                            <SelectItem value="failed">
-                              <div className="flex items-center gap-2">
-                                <XCircle className="h-4 w-4 text-red-600" />
-                                Failed
-                              </div>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Issues */}
-                      {(formData.checkStatus === "failed" || formData.checkStatus === "requires_review") && (
-                        <div className="space-y-2">
-                          <Label>Issues Identified</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              value={newIssue}
-                              onChange={(e) => setNewIssue(e.target.value)}
-                              placeholder="Describe an issue..."
-                              onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddIssue())}
-                            />
-                            <Button type="button" onClick={handleAddIssue} variant="outline">
-                              Add
-                            </Button>
-                          </div>
-                          {issues.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {issues.map((issue, index) => (
-                                <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                                  {issue}
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveIssue(index)}
-                                    className="ml-1 text-xs hover:text-red-600"
-                                  >
-                                    ×
-                                  </button>
-                                </Badge>
-                              ))}
+                        {/* Issues */}
+                        {(formData.checkStatus === "failed" || formData.checkStatus === "requires_review") && (
+                          <div className="space-y-2">
+                            <Label>Issues Identified</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                value={newIssue}
+                                onChange={(e) => setNewIssue(e.target.value)}
+                                placeholder="Describe an issue..."
+                                onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddIssue())}
+                              />
+                              <Button type="button" onClick={handleAddIssue} variant="outline">
+                                Add
+                              </Button>
                             </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Additional Details */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="medication-count">Medication Count</Label>
-                          <Input
-                            id="medication-count"
-                            type="number"
-                            value={formData.medicationCount}
-                            onChange={(e) => setFormData({...formData, medicationCount: e.target.value})}
-                            placeholder="0"
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="pack-weight">Pack Weight (g)</Label>
-                          <Input
-                            id="pack-weight"
-                            type="number"
-                            step="0.1"
-                            value={formData.packWeight}
-                            onChange={(e) => setFormData({...formData, packWeight: e.target.value})}
-                            placeholder="0.0"
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="batch-number">Batch Number</Label>
-                          <Input
-                            id="batch-number"
-                            value={formData.batchNumber}
-                            onChange={(e) => setFormData({...formData, batchNumber: e.target.value})}
-                            placeholder="Batch #"
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="expiry-date">Earliest Expiry</Label>
-                          <Input
-                            id="expiry-date"
-                            type="date"
-                            value={formData.expiryDate}
-                            onChange={(e) => setFormData({...formData, expiryDate: e.target.value})}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Notes */}
-                      <div className="space-y-2">
-                        <Label htmlFor="notes">Notes</Label>
-                        <Textarea
-                          id="notes"
-                          value={formData.notes}
-                          onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                          placeholder="Additional notes about the pack check..."
-                          rows={3}
-                        />
-                      </div>
-
-                      {/* Submit Button */}
-                      <Button type="submit" disabled={isSubmitting || !selectedPatient} className="w-full">
-                        {isSubmitting ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                            Recording Check...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-2" />
-                            Record Pack Check
-                          </>
+                            {formData.issues.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-2">
+                                {formData.issues.map((issue: string, index: number) => (
+                                  <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                                    {issue}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveIssue(index)}
+                                      className="ml-1 text-xs hover:text-red-600"
+                                    >
+                                      ×
+                                    </button>
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
-                      </Button>
-                    </form>
+
+                        {/* Additional Details */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="medication-count">Medication Count</Label>
+                            <Input
+                              id="medication-count"
+                              type="number"
+                              value={formData.medicationCount}
+                              onChange={(e) => setFormData({...formData, medicationCount: e.target.value})}
+                              placeholder="0"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="pack-weight">Pack Weight (g)</Label>
+                            <Input
+                              id="pack-weight"
+                              type="number"
+                              step="0.1"
+                              value={formData.packWeight}
+                              onChange={(e) => setFormData({...formData, packWeight: e.target.value})}
+                              placeholder="0.0"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="batch-number">Batch Number</Label>
+                            <Input
+                              id="batch-number"
+                              value={formData.batchNumber}
+                              onChange={(e) => setFormData({...formData, batchNumber: e.target.value})}
+                              placeholder="Batch #"
+                            />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="expiry-date">Earliest Expiry</Label>
+                            <Input
+                              id="expiry-date"
+                              type="date"
+                              value={formData.expiryDate}
+                              onChange={(e) => setFormData({...formData, expiryDate: e.target.value})}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        <div className="space-y-2">
+                          <Label htmlFor="notes">Notes</Label>
+                          <Textarea
+                            id="notes"
+                            value={formData.notes}
+                            onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                            placeholder="Additional notes about the pack check..."
+                            rows={3}
+                          />
+                        </div>
+
+                        {/* Navigation Buttons */}
+                        <div className="flex justify-between pt-4">
+                          <Button 
+                            type="button"
+                            variant="outline"
+                            onClick={() => setCurrentStep(2)}
+                            className="min-w-32"
+                          >
+                            Back
+                          </Button>
+                          <Button 
+                            type="button"
+                            onClick={handleSubmit}
+                            disabled={isSubmitting}
+                            className="min-w-32"
+                          >
+                            {isSubmitting ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Recording...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="h-4 w-4 mr-2" />
+                                Complete Check
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
