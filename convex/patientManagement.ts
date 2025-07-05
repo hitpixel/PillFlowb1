@@ -1401,86 +1401,6 @@ export const requestMedicationAddition = mutation({
   },
 });
 
-// HELPER FUNCTIONS
-
-// Check if user has access to a patient
-async function checkPatientAccess(ctx: any, patientId: any, userProfileId: any) {
-  const patient = await ctx.db.get(patientId);
-  if (!patient) return false;
-
-  const userProfile = await ctx.db.get(userProfileId);
-  if (!userProfile) return false;
-
-  // Same organization always has access
-  if (patient.organizationId === userProfile.organizationId) {
-    return true;
-  }
-
-  // Check if user has been granted access via token
-  const accessGrant = await ctx.db
-    .query("tokenAccessGrants")
-    .withIndex("by_patient", (q: any) => q.eq("patientId", patientId))
-    .filter((q: any) => q.eq(q.field("grantedTo"), userProfileId))
-    .filter((q: any) => q.eq(q.field("status"), "approved"))
-    .filter((q: any) => q.eq(q.field("isActive"), true))
-    .first();
-
-  if (!accessGrant) return false;
-
-  // Check if access has expired
-  if (accessGrant.expiresAt && accessGrant.expiresAt < Date.now()) {
-    // Automatically revoke expired access
-    await ctx.db.patch(accessGrant._id, {
-      status: "revoked",
-      isActive: false,
-      revokedAt: Date.now(),
-    });
-    return false;
-  }
-
-  return true;
-}
-
-// Helper function to log medication changes
-async function logMedicationChange(ctx: any, params: {
-  patientId: any;
-  medicationId?: any;
-  actionType: "added" | "updated" | "stopped" | "deleted" | "change_requested" | "change_approved" | "change_rejected" | "removal_requested" | "removal_approved" | "removal_rejected" | "request_canceled" | "addition_requested" | "addition_approved" | "addition_rejected";
-  medicationName: string;
-  performedBy: any;
-  performedByOrg: any;
-  currentDosage?: string;
-  currentMorningDose?: string;
-  currentAfternoonDose?: string;
-  currentEveningDose?: string;
-  currentNightDose?: string;
-  currentInstructions?: string;
-  changes?: string;
-  previousState?: string;
-  requestNotes?: string;
-  status?: "completed" | "pending" | "approved" | "rejected" | "canceled";
-}) {
-  await ctx.db.insert("medicationLogs", {
-    patientId: params.patientId,
-    medicationId: params.medicationId || undefined,
-    actionType: params.actionType,
-    medicationName: params.medicationName,
-    changes: params.changes,
-    requestNotes: params.requestNotes,
-    performedBy: params.performedBy,
-    performedByOrg: params.performedByOrg,
-    performedAt: Date.now(),
-    currentDosage: params.currentDosage,
-    currentMorningDose: params.currentMorningDose,
-    currentAfternoonDose: params.currentAfternoonDose,
-    currentEveningDose: params.currentEveningDose,
-    currentNightDose: params.currentNightDose,
-    currentInstructions: params.currentInstructions,
-    previousState: params.previousState,
-    status: params.status || "completed",
-  });
-}
-
 // SCRIPTS MANAGEMENT
 
 // Generate upload URL for patient scripts
@@ -1663,28 +1583,13 @@ export const deletePatientScript = mutation({
       throw new Error("Unauthorized: No access to this patient");
     }
 
-    // Only allow deletion if user is from the same organization that uploaded the script
-    // or if user is from the patient's organization
-    const patient = await ctx.db.get(script.patientId);
-    const canDelete = script.uploadedBy === userProfile._id || 
-                     (patient && patient.organizationId === userProfile.organizationId);
-
-    if (!canDelete) {
-      throw new Error("Unauthorized: You can only delete scripts you uploaded or if you're from the patient's organization");
-    }
-
-    // Mark as inactive instead of deleting
+    // Soft delete the script
     await ctx.db.patch(args.scriptId, {
       isActive: false,
     });
 
-    // Delete the actual file from storage
-    try {
-      await ctx.storage.delete(script.fileUrl as any);
-    } catch (error) {
-      console.error("Failed to delete file from storage:", error);
-      // Continue with database update even if storage deletion fails
-    }
+    // Delete from storage
+    await ctx.storage.delete(script.fileUrl as any);
 
     // Add to communication log
     await ctx.db.insert("patientComments", {
@@ -1698,6 +1603,249 @@ export const deletePatientScript = mutation({
       createdAt: Date.now(),
     });
 
-    return true;
+    return { success: true };
   },
-}); 
+});
+
+// ETOKENS MANAGEMENT
+
+// Add patient etoken (token key or e-script link)
+export const addPatientEtoken = mutation({
+  args: {
+    patientId: v.id("patients"),
+    tokenType: v.union(
+      v.literal("token_key"),
+      v.literal("e_script_link")
+    ),
+    tokenValue: v.string(),
+    description: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) throw new Error("User profile not found");
+
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Unauthorized: No access to this patient");
+    }
+
+    // Validate token value is not empty
+    if (!args.tokenValue.trim()) {
+      throw new Error("Token value cannot be empty");
+    }
+
+    const etokenId = await ctx.db.insert("patientEtokens", {
+      patientId: args.patientId,
+      tokenType: args.tokenType,
+      tokenValue: args.tokenValue.trim(),
+      description: args.description,
+      addedBy: userProfile._id,
+      addedByOrg: userProfile.organizationId!,
+      addedAt: Date.now(),
+      isActive: true,
+    });
+
+    // Add to communication log
+    const tokenTypeDisplay = args.tokenType === "token_key" ? "e-script token key" : "e-script link";
+    await ctx.db.insert("patientComments", {
+      patientId: args.patientId,
+      authorId: userProfile._id,
+      authorOrg: userProfile.organizationId!,
+      content: `Added ${tokenTypeDisplay}${args.description ? ` - ${args.description}` : ''}`,
+      commentType: "system",
+      isPrivate: false,
+      isActive: true,
+      createdAt: Date.now(),
+    });
+
+    return etokenId;
+  },
+});
+
+// Get patient etokens
+export const getPatientEtokens = query({
+  args: {
+    patientId: v.id("patients"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) throw new Error("User profile not found");
+
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Unauthorized: No access to this patient");
+    }
+
+    const etokens = await ctx.db
+      .query("patientEtokens")
+      .withIndex("by_patient", (q) => q.eq("patientId", args.patientId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .order("desc")
+      .collect();
+
+    // Enrich with user and organization details
+    const enrichedEtokens = await Promise.all(
+      etokens.map(async (etoken) => {
+        const addedByUser = await ctx.db.get(etoken.addedBy);
+        const addedByOrg = await ctx.db.get(etoken.addedByOrg);
+
+        return {
+          ...etoken,
+          addedByUser: addedByUser ? {
+            firstName: addedByUser.firstName,
+            lastName: addedByUser.lastName,
+          } : null,
+          addedByOrg: addedByOrg ? {
+            name: addedByOrg.name,
+            type: addedByOrg.type,
+          } : null,
+        };
+      })
+    );
+
+    return enrichedEtokens;
+  },
+});
+
+// Delete patient etoken
+export const deletePatientEtoken = mutation({
+  args: {
+    etokenId: v.id("patientEtokens"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) throw new Error("User profile not found");
+
+    const etoken = await ctx.db.get(args.etokenId);
+    if (!etoken) throw new Error("Etoken not found");
+
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, etoken.patientId, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Unauthorized: No access to this patient");
+    }
+
+    // Soft delete the etoken
+    await ctx.db.patch(args.etokenId, {
+      isActive: false,
+    });
+
+    // Add to communication log
+    const tokenTypeDisplay = etoken.tokenType === "token_key" ? "e-script token key" : "e-script link";
+    await ctx.db.insert("patientComments", {
+      patientId: etoken.patientId,
+      authorId: userProfile._id,
+      authorOrg: userProfile.organizationId!,
+      content: `Deleted ${tokenTypeDisplay}${etoken.description ? ` - ${etoken.description}` : ''}`,
+      commentType: "system",
+      isPrivate: false,
+      isActive: true,
+      createdAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// HELPER FUNCTIONS
+
+// Check if user has access to a patient
+async function checkPatientAccess(ctx: any, patientId: any, userProfileId: any) {
+  const patient = await ctx.db.get(patientId);
+  if (!patient) return false;
+
+  const userProfile = await ctx.db.get(userProfileId);
+  if (!userProfile) return false;
+
+  // Same organization always has access
+  if (patient.organizationId === userProfile.organizationId) {
+    return true;
+  }
+
+  // Check if user has been granted access via token
+  const accessGrant = await ctx.db
+    .query("tokenAccessGrants")
+    .withIndex("by_patient", (q: any) => q.eq("patientId", patientId))
+    .filter((q: any) => q.eq(q.field("grantedTo"), userProfileId))
+    .filter((q: any) => q.eq(q.field("status"), "approved"))
+    .filter((q: any) => q.eq(q.field("isActive"), true))
+    .first();
+
+  if (!accessGrant) return false;
+
+  // Check if access has expired
+  if (accessGrant.expiresAt && accessGrant.expiresAt < Date.now()) {
+    // Automatically revoke expired access
+    await ctx.db.patch(accessGrant._id, {
+      status: "revoked",
+      isActive: false,
+      revokedAt: Date.now(),
+    });
+    return false;
+  }
+
+  return true;
+}
+
+// Helper function to log medication changes
+async function logMedicationChange(ctx: any, params: {
+  patientId: any;
+  medicationId?: any;
+  actionType: "added" | "updated" | "stopped" | "deleted" | "change_requested" | "change_approved" | "change_rejected" | "removal_requested" | "removal_approved" | "removal_rejected" | "request_canceled" | "addition_requested" | "addition_approved" | "addition_rejected";
+  medicationName: string;
+  performedBy: any;
+  performedByOrg: any;
+  currentDosage?: string;
+  currentMorningDose?: string;
+  currentAfternoonDose?: string;
+  currentEveningDose?: string;
+  currentNightDose?: string;
+  currentInstructions?: string;
+  changes?: string;
+  previousState?: string;
+  requestNotes?: string;
+  status?: "completed" | "pending" | "approved" | "rejected" | "canceled";
+}) {
+  await ctx.db.insert("medicationLogs", {
+    patientId: params.patientId,
+    medicationId: params.medicationId || undefined,
+    actionType: params.actionType,
+    medicationName: params.medicationName,
+    changes: params.changes,
+    requestNotes: params.requestNotes,
+    performedBy: params.performedBy,
+    performedByOrg: params.performedByOrg,
+    performedAt: Date.now(),
+    currentDosage: params.currentDosage,
+    currentMorningDose: params.currentMorningDose,
+    currentAfternoonDose: params.currentAfternoonDose,
+    currentEveningDose: params.currentEveningDose,
+    currentNightDose: params.currentNightDose,
+    currentInstructions: params.currentInstructions,
+    previousState: params.previousState,
+    status: params.status || "completed",
+  });
+} 

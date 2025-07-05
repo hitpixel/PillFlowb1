@@ -405,4 +405,24 @@ export default defineSchema({
     .index("by_file_type", ["fileType"])
     .index("by_active", ["isActive"]),
 
+  // Patient etokens (e-script token keys and links)
+  patientEtokens: defineTable({
+    patientId: v.id("patients"),
+    tokenType: v.union(
+      v.literal("token_key"),
+      v.literal("e_script_link")
+    ),
+    tokenValue: v.string(), // The actual token key or e-script link
+    description: v.optional(v.string()),
+    addedBy: v.id("userProfiles"),
+    addedByOrg: v.id("organizations"),
+    addedAt: v.float64(),
+    isActive: v.boolean(),
+  })
+    .index("by_patient", ["patientId"])
+    .index("by_token_type", ["tokenType"])
+    .index("by_added_by", ["addedBy"])
+    .index("by_added_at", ["addedAt"])
+    .index("by_active", ["isActive"]),
+
 });
