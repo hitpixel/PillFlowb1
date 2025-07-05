@@ -68,10 +68,11 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   const [editingMedication, setEditingMedication] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Query for medications
+  // Query for medications and current user
   const medications = useQuery(api.patientManagement.getPatientMedications, {
     patientId: patientId as any,
   });
+  const currentUser = useQuery(api.users.getCurrentUserProfile);
 
   // Mutations
   const addMedication = useMutation(api.patientManagement.addPatientMedication);
@@ -79,7 +80,6 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   const requestMedicationChange = useMutation(api.patientManagement.requestMedicationChange);
   const approveMedicationRequest = useMutation(api.patientManagement.approveMedicationRequest);
   const rejectMedicationRequest = useMutation(api.patientManagement.rejectMedicationRequest);
-  // Note: pendingRequests are now included in the medication data from getPatientMedications
 
   const handleAddMedication = async (data: MedicationFormData) => {
     try {
@@ -249,7 +249,12 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
     });
   };
 
-  // Note: Shared access is now determined by the presence of pending requests
+  // Check if current user has shared access to a medication
+  const isSharedAccess = (medication: any) => {
+    if (!currentUser || !medication.organizationId) return false;
+    // User has shared access if their organization is different from medication's organization
+    return currentUser.organizationId !== medication.organizationId;
+  };
 
   const isMedicationActive = (medication: any) => {
     if (!medication.isActive) return false;
@@ -297,13 +302,14 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
           <Badge variant="outline">
             {medications?.filter(m => isMedicationActive(m)).length || 0} Active
           </Badge>
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Medication
-              </Button>
-            </DialogTrigger>
+          {currentUser && (
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Medication
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Medication</DialogTitle>
@@ -318,6 +324,7 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
               />
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
@@ -332,9 +339,29 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
         </Card>
       ) : (
         <div className="space-y-4">
-          {medications?.map((medication: any) => (
-            <Card key={medication._id} className={!isMedicationActive(medication) ? "opacity-60" : ""}>
-              <CardContent className="p-6">
+          {medications
+            ?.sort((a: any, b: any) => {
+              // Sort active medications first, then inactive/removed ones at the bottom
+              if (isMedicationActive(a) && !isMedicationActive(b)) return -1;
+              if (!isMedicationActive(a) && isMedicationActive(b)) return 1;
+              // Within each group, sort by creation date (newest first)
+              return b.addedAt - a.addedAt;
+            })
+            ?.map((medication: any) => {
+            let cardClassName = "";
+            if (!isMedicationActive(medication)) {
+              cardClassName = "opacity-60 border-gray-200";
+            } else if (medication.hasPendingRequest) {
+              if (medication.pendingRequest?.requestType === "remove") {
+                cardClassName = "border-red-200 bg-red-50 opacity-75";
+              } else {
+                cardClassName = "border-yellow-200 bg-yellow-50";
+              }
+            }
+            
+            return (
+              <Card key={medication._id} className={cardClassName}>
+                <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
@@ -350,7 +377,7 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                       ) : (
                         <Badge variant="secondary">
                           <AlertCircle className="h-3 w-3 mr-1" />
-                          Stopped
+                          {medication.isActive === false ? "Removed" : "Stopped"}
                         </Badge>
                       )}
                       {medication.hasPendingRequest && (
@@ -400,12 +427,12 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                           onCancel={() => setEditingMedication(null)}
                           isLoading={isSubmitting}
                           isEdit={true}
-                          isSharedAccess={medication.hasPendingRequest} // Simplified check
+                          isSharedAccess={isSharedAccess(medication)}
                           canRequestRemoval={true}
                         />
                       </DialogContent>
                     </Dialog>
-                    {medication.hasPendingRequest && medication.pendingRequest && (
+                    {medication.hasPendingRequest && medication.pendingRequest && !isSharedAccess(medication) && (
                       <div className="flex items-center gap-2">
                         <Button 
                           variant="default" 
@@ -602,9 +629,10 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                     {formatDistanceToNow(new Date(medication.addedAt), { addSuffix: true })}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
