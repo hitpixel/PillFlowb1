@@ -254,10 +254,18 @@ export default defineSchema({
       v.literal("added"),
       v.literal("updated"),
       v.literal("stopped"),
-      v.literal("deleted")
+      v.literal("deleted"),
+      v.literal("change_requested"),
+      v.literal("change_approved"),
+      v.literal("change_rejected"),
+      v.literal("removal_requested"),
+      v.literal("removal_approved"),
+      v.literal("removal_rejected"),
+      v.literal("request_canceled")
     ),
     medicationName: v.string(),
     changes: v.optional(v.string()), // JSON string of changes made
+    requestNotes: v.optional(v.string()), // Notes from shared user
     performedBy: v.id("userProfiles"),
     performedByOrg: v.id("organizations"),
     performedAt: v.float64(),
@@ -269,12 +277,75 @@ export default defineSchema({
     currentNightDose: v.optional(v.string()),
     currentInstructions: v.optional(v.string()),
     previousState: v.optional(v.string()), // JSON string of previous state
+    // Request status
+    status: v.union(
+      v.literal("completed"),
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("canceled")
+    ),
   })
     .index("by_patient", ["patientId"])
     .index("by_medication", ["medicationId"])
     .index("by_performed_by", ["performedBy"])
     .index("by_performed_at", ["performedAt"])
-    .index("by_action_type", ["actionType"]),
+    .index("by_action_type", ["actionType"])
+    .index("by_status", ["status"]),
+
+  // Pending medication change requests
+  medicationChangeRequests: defineTable({
+    patientId: v.id("patients"),
+    medicationId: v.id("patientMedications"),
+    requestType: v.union(
+      v.literal("update"),
+      v.literal("remove")
+    ),
+    // Requested changes
+    requestedChanges: v.object({
+      medicationName: v.optional(v.string()),
+      dosage: v.optional(v.string()),
+      morningDose: v.optional(v.string()),
+      afternoonDose: v.optional(v.string()),
+      eveningDose: v.optional(v.string()),
+      nightDose: v.optional(v.string()),
+      instructions: v.optional(v.string()),
+      prescribedBy: v.optional(v.string()),
+      prescribedDate: v.optional(v.string()),
+      startDate: v.optional(v.string()),
+      endDate: v.optional(v.string()),
+      // FDA NDC fields
+      fdaNdc: v.optional(v.string()),
+      genericName: v.optional(v.string()),
+      brandName: v.optional(v.string()),
+      dosageForm: v.optional(v.string()),
+      route: v.optional(v.string()),
+      manufacturer: v.optional(v.string()),
+      activeIngredient: v.optional(v.string()),
+      strength: v.optional(v.string()),
+    }),
+    requestNotes: v.optional(v.string()),
+    requestedBy: v.id("userProfiles"),
+    requestedByOrg: v.id("organizations"),
+    requestedAt: v.float64(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("canceled")
+    ),
+    // Original state for comparison
+    originalState: v.string(), // JSON string of original medication state
+    // Approval/rejection
+    reviewedBy: v.optional(v.id("userProfiles")),
+    reviewedAt: v.optional(v.float64()),
+    reviewNotes: v.optional(v.string()),
+  })
+    .index("by_patient", ["patientId"])
+    .index("by_medication", ["medicationId"])
+    .index("by_requested_by", ["requestedBy"])
+    .index("by_status", ["status"])
+    .index("by_requested_at", ["requestedAt"]),
 
   // Patient comments/chat system
   patientComments: defineTable({

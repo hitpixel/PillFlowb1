@@ -23,7 +23,7 @@ interface MedicationLogProps {
 
 interface MedicationLogEntry {
   _id: Id<"medicationLogs">;
-  actionType: "added" | "updated" | "stopped" | "deleted";
+  actionType: "added" | "updated" | "stopped" | "deleted" | "change_requested" | "change_approved" | "change_rejected" | "removal_requested" | "removal_approved" | "removal_rejected" | "request_canceled";
   medicationName: string;
   performedAt: number;
   currentDosage?: string;
@@ -33,6 +33,8 @@ interface MedicationLogEntry {
   currentNightDose?: string;
   currentInstructions?: string;
   changes?: string;
+  requestNotes?: string;
+  status?: "completed" | "pending" | "approved" | "rejected" | "canceled";
   performedByUser: {
     firstName: string;
     lastName: string;
@@ -64,6 +66,13 @@ export function MedicationLog({ patientId }: MedicationLogProps) {
       case 'updated': return <Edit className="h-4 w-4" />;
       case 'stopped': return <Square className="h-4 w-4" />;
       case 'deleted': return <Trash2 className="h-4 w-4" />;
+      case 'change_requested': return <Edit className="h-4 w-4" />;
+      case 'change_approved': return <Edit className="h-4 w-4" />;
+      case 'change_rejected': return <Edit className="h-4 w-4" />;
+      case 'removal_requested': return <Trash2 className="h-4 w-4" />;
+      case 'removal_approved': return <Trash2 className="h-4 w-4" />;
+      case 'removal_rejected': return <Trash2 className="h-4 w-4" />;
+      case 'request_canceled': return <Square className="h-4 w-4" />;
       default: return <Pill className="h-4 w-4" />;
     }
   };
@@ -74,6 +83,13 @@ export function MedicationLog({ patientId }: MedicationLogProps) {
       case 'updated': return 'bg-blue-100 text-blue-800';
       case 'stopped': return 'bg-orange-100 text-orange-800';
       case 'deleted': return 'bg-red-100 text-red-800';
+      case 'change_requested': return 'bg-yellow-100 text-yellow-800';
+      case 'change_approved': return 'bg-green-100 text-green-800';
+      case 'change_rejected': return 'bg-red-100 text-red-800';
+      case 'removal_requested': return 'bg-yellow-100 text-yellow-800';
+      case 'removal_approved': return 'bg-green-100 text-green-800';
+      case 'removal_rejected': return 'bg-red-100 text-red-800';
+      case 'request_canceled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -84,6 +100,13 @@ export function MedicationLog({ patientId }: MedicationLogProps) {
       case 'updated': return 'Updated';
       case 'stopped': return 'Stopped';
       case 'deleted': return 'Deleted';
+      case 'change_requested': return 'Change Requested';
+      case 'change_approved': return 'Change Approved';
+      case 'change_rejected': return 'Change Rejected';
+      case 'removal_requested': return 'Removal Requested';
+      case 'removal_approved': return 'Removal Approved';
+      case 'removal_rejected': return 'Removal Rejected';
+      case 'request_canceled': return 'Request Canceled';
       default: return 'Changed';
     }
   };
@@ -226,6 +249,13 @@ export function MedicationLog({ patientId }: MedicationLogProps) {
                       <div className="mt-3 p-2 bg-gray-50 rounded text-xs">
                         <p className="font-medium text-muted-foreground mb-1">Changes:</p>
                         <p className="text-muted-foreground">{log.changes}</p>
+                      </div>
+                    )}
+                    
+                    {log.requestNotes && (
+                      <div className="mt-3 p-2 bg-blue-50 rounded text-xs">
+                        <p className="font-medium text-blue-700 mb-1">Request Notes:</p>
+                        <p className="text-blue-800">{log.requestNotes}</p>
                       </div>
                     )}
                   </div>

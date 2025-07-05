@@ -59,6 +59,8 @@ interface MedicationFormData {
   manufacturer?: string;
   activeIngredient?: string;
   strength?: string;
+  // Request notes for shared users
+  requestNotes?: string;
 }
 
 export function PatientMedications({ patientId }: PatientMedicationsProps) {
@@ -74,6 +76,10 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   // Mutations
   const addMedication = useMutation(api.patientManagement.addPatientMedication);
   const updateMedication = useMutation(api.patientManagement.updatePatientMedication);
+  const requestMedicationChange = useMutation(api.patientManagement.requestMedicationChange);
+  const approveMedicationRequest = useMutation(api.patientManagement.approveMedicationRequest);
+  const rejectMedicationRequest = useMutation(api.patientManagement.rejectMedicationRequest);
+  // Note: pendingRequests are now included in the medication data from getPatientMedications
 
   const handleAddMedication = async (data: MedicationFormData) => {
     try {
@@ -166,6 +172,73 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
     }
   };
 
+  const handleRequestChange = async (data: MedicationFormData, requestType: "update" | "remove") => {
+    if (!editingMedication) return;
+
+    try {
+      setIsSubmitting(true);
+      
+      const requestedChanges = requestType === "update" ? {
+        medicationName: data.medicationName,
+        dosage: data.dosage,
+        morningDose: data.morningDose || undefined,
+        afternoonDose: data.afternoonDose || undefined,
+        eveningDose: data.eveningDose || undefined,
+        nightDose: data.nightDose || undefined,
+        instructions: data.instructions || undefined,
+        prescribedBy: data.prescribedBy || undefined,
+        prescribedDate: data.prescribedDate || undefined,
+        startDate: data.startDate || undefined,
+        endDate: data.endDate || undefined,
+        // FDA NDC fields
+        fdaNdc: data.fdaNdc || undefined,
+        genericName: data.genericName || undefined,
+        brandName: data.brandName || undefined,
+        dosageForm: data.dosageForm || undefined,
+        route: data.route || undefined,
+        manufacturer: data.manufacturer || undefined,
+        activeIngredient: data.activeIngredient || undefined,
+        strength: data.strength || undefined,
+      } : undefined;
+
+      await requestMedicationChange({
+        medicationId: editingMedication._id,
+        requestType,
+        requestedChanges,
+        requestNotes: data.requestNotes,
+      });
+      
+      const actionText = requestType === "remove" ? "removal" : "change";
+      toast.success(`Medication ${actionText} request submitted successfully`);
+      setEditingMedication(null);
+    } catch (error) {
+      toast.error("Failed to submit request");
+      console.error(error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleApproveRequest = async (requestId: string) => {
+    try {
+      await approveMedicationRequest({ requestId: requestId as any });
+      toast.success("Request approved successfully");
+    } catch (error) {
+      toast.error("Failed to approve request");
+      console.error(error);
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string) => {
+    try {
+      await rejectMedicationRequest({ requestId: requestId as any });
+      toast.success("Request rejected");
+    } catch (error) {
+      toast.error("Failed to reject request");
+      console.error(error);
+    }
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -175,6 +248,8 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
       year: 'numeric'
     });
   };
+
+  // Note: Shared access is now determined by the presence of pending requests
 
   const isMedicationActive = (medication: any) => {
     if (!medication.isActive) return false;
@@ -278,6 +353,12 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                           Stopped
                         </Badge>
                       )}
+                      {medication.hasPendingRequest && (
+                        <Badge className={medication.pendingRequest?.requestType === "remove" ? "bg-red-100 text-red-800" : "bg-yellow-100 text-yellow-800"}>
+                          <Clock className="h-3 w-3 mr-1" />
+                          {medication.pendingRequest?.requestType === "remove" ? "Removal Pending" : "Changes Pending"}
+                        </Badge>
+                      )}
                       <Badge variant="outline">
                         <Building2 className="h-3 w-3 mr-1" />
                         {medication.organization?.name}
@@ -315,13 +396,35 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                         <MedicationForm
                           initialData={getEditInitialData(medication)}
                           onSubmit={handleEditMedication}
+                          onRequestChange={handleRequestChange}
                           onCancel={() => setEditingMedication(null)}
                           isLoading={isSubmitting}
                           isEdit={true}
+                          isSharedAccess={medication.hasPendingRequest} // Simplified check
+                          canRequestRemoval={true}
                         />
                       </DialogContent>
                     </Dialog>
-                    {isMedicationActive(medication) && (
+                    {medication.hasPendingRequest && medication.pendingRequest && (
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={() => handleApproveRequest(medication.pendingRequest.requestId)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          Approve
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => handleRejectRequest(medication.pendingRequest.requestId)}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    )}
+                    {isMedicationActive(medication) && !medication.hasPendingRequest && (
                       <Button 
                         variant="destructive" 
                         size="sm"
@@ -385,6 +488,47 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                     </div>
                   </div>
                 </div>
+
+                {/* Pending Request Information */}
+                {medication.hasPendingRequest && medication.pendingRequest && (
+                  <>
+                    <Separator className="my-4" />
+                    <div className={`border rounded-lg p-3 ${medication.pendingRequest.requestType === "remove" ? "bg-red-50 border-red-200" : "bg-yellow-50 border-yellow-200"}`}>
+                      <p className={`text-sm font-medium mb-2 flex items-center gap-2 ${medication.pendingRequest.requestType === "remove" ? "text-red-900" : "text-yellow-900"}`}>
+                        <Clock className="h-4 w-4" />
+                        Pending {medication.pendingRequest.requestType === "remove" ? "Removal" : "Change"} Request
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <p className={`font-medium ${medication.pendingRequest.requestType === "remove" ? "text-red-600" : "text-yellow-600"}`}>Requested By</p>
+                          <p className={medication.pendingRequest.requestType === "remove" ? "text-red-800" : "text-yellow-800"}>
+                            {medication.pendingRequest.requestedBy ? 
+                              `${medication.pendingRequest.requestedBy.firstName} ${medication.pendingRequest.requestedBy.lastName}` : 
+                              'Unknown User'
+                            }
+                          </p>
+                          <p className={medication.pendingRequest.requestType === "remove" ? "text-red-700" : "text-yellow-700"}>
+                            {medication.pendingRequest.requestedByOrg?.name} ({medication.pendingRequest.requestedByOrg?.type})
+                          </p>
+                        </div>
+                        <div>
+                          <p className={`font-medium ${medication.pendingRequest.requestType === "remove" ? "text-red-600" : "text-yellow-600"}`}>Requested</p>
+                          <p className={medication.pendingRequest.requestType === "remove" ? "text-red-800" : "text-yellow-800"}>
+                            {formatDistanceToNow(new Date(medication.pendingRequest.requestedAt), { addSuffix: true })}
+                          </p>
+                        </div>
+                      </div>
+                      {medication.pendingRequest.requestNotes && (
+                        <div className="mt-2">
+                          <p className={`text-xs font-medium ${medication.pendingRequest.requestType === "remove" ? "text-red-600" : "text-yellow-600"}`}>Notes:</p>
+                          <p className={`text-xs ${medication.pendingRequest.requestType === "remove" ? "text-red-800" : "text-yellow-800"}`}>
+                            {medication.pendingRequest.requestNotes}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
 
                 {/* FDA Information */}
                 {(medication.fdaNdc || medication.genericName || medication.brandName || medication.manufacturer) && (

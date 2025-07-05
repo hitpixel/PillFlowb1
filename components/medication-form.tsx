@@ -35,22 +35,30 @@ interface MedicationFormData {
   manufacturer?: string;
   activeIngredient?: string;
   strength?: string;
+  // Request notes for shared users
+  requestNotes?: string;
 }
 
 interface MedicationFormProps {
   initialData?: Partial<MedicationFormData>;
   onSubmit: (data: MedicationFormData) => Promise<void>;
+  onRequestChange?: (data: MedicationFormData, requestType: "update" | "remove") => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
   isEdit?: boolean;
+  isSharedAccess?: boolean;
+  canRequestRemoval?: boolean;
 }
 
 export function MedicationForm({
   initialData,
   onSubmit,
+  onRequestChange,
   onCancel,
   isLoading = false,
   isEdit = false,
+  isSharedAccess = false,
+  canRequestRemoval = false,
 }: MedicationFormProps) {
   const [formData, setFormData] = useState<MedicationFormData>({
     medicationName: initialData?.medicationName || "",
@@ -73,6 +81,7 @@ export function MedicationForm({
     manufacturer: initialData?.manufacturer || "",
     activeIngredient: initialData?.activeIngredient || "",
     strength: initialData?.strength || "",
+    requestNotes: initialData?.requestNotes || "",
   });
 
   const [selectedFDAMedication, setSelectedFDAMedication] = useState<MedicationSuggestion | null>(null);
@@ -122,11 +131,37 @@ export function MedicationForm({
     }
 
     try {
-      await onSubmit(formData);
-      toast.success(isEdit ? "Medication updated successfully" : "Medication added successfully");
+      if (isSharedAccess && isEdit) {
+        // Shared users request changes instead of directly updating
+        if (!onRequestChange) {
+          toast.error("Request change handler not provided");
+          return;
+        }
+        await onRequestChange(formData, "update");
+        toast.success("Change request submitted for approval");
+      } else {
+        // Regular users or new medications
+        await onSubmit(formData);
+        toast.success(isEdit ? "Medication updated successfully" : "Medication added successfully");
+      }
     } catch (error) {
       console.error("Error saving medication:", error);
       toast.error("Failed to save medication");
+    }
+  };
+
+  const handleRequestRemoval = async () => {
+    if (!onRequestChange) {
+      toast.error("Request change handler not provided");
+      return;
+    }
+
+    try {
+      await onRequestChange(formData, "remove");
+      toast.success("Removal request submitted for approval");
+    } catch (error) {
+      console.error("Error requesting removal:", error);
+      toast.error("Failed to request removal");
     }
   };
 
@@ -300,6 +335,23 @@ export function MedicationForm({
                 rows={3}
               />
             </div>
+
+            {/* Request Notes for Shared Users */}
+            {isSharedAccess && isEdit && (
+              <div className="space-y-2">
+                <Label htmlFor="requestNotes">Request Notes</Label>
+                <Textarea
+                  id="requestNotes"
+                  value={formData.requestNotes || ""}
+                  onChange={(e) => handleInputChange("requestNotes", e.target.value)}
+                  placeholder="Please explain why you are requesting this change..."
+                  rows={3}
+                />
+                <p className="text-sm text-muted-foreground">
+                  These notes will help the medication owner understand your change request
+                </p>
+              </div>
+            )}
           </div>
 
           <Separator />
@@ -403,12 +455,37 @@ export function MedicationForm({
 
           {/* Form Actions */}
           <div className="flex gap-2 pt-4">
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Saving..." : (isEdit ? "Update Medication" : "Add Medication")}
-            </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
+            {isSharedAccess && isEdit ? (
+              // Shared user actions - request changes
+              <>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? "Requesting..." : "Request Changes"}
+                </Button>
+                {canRequestRemoval && (
+                  <Button 
+                    type="button" 
+                    variant="destructive" 
+                    onClick={handleRequestRemoval}
+                    disabled={isLoading}
+                  >
+                    Request Removal
+                  </Button>
+                )}
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              // Regular user actions - direct update/add
+              <>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? "Saving..." : (isEdit ? "Update Medication" : "Add Medication")}
+                </Button>
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Cancel
+                </Button>
+              </>
+            )}
           </div>
         </form>
       </CardContent>
