@@ -4,9 +4,6 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -16,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { 
   Pill, 
@@ -27,12 +23,15 @@ import {
   Building2,
   Clock,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  FlaskConical,
+  Layers
 } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { MedicationForm } from "@/components/medication-form";
 
 interface PatientMedicationsProps {
   patientId: string;
@@ -47,23 +46,20 @@ interface MedicationFormData {
   prescribedDate: string;
   startDate: string;
   endDate: string;
+  // FDA NDC fields
+  fdaNdc?: string;
+  genericName?: string;
+  brandName?: string;
+  dosageForm?: string;
+  route?: string;
+  manufacturer?: string;
+  activeIngredient?: string;
+  strength?: string;
 }
-
-const initialFormData: MedicationFormData = {
-  medicationName: "",
-  dosage: "",
-  frequency: "",
-  instructions: "",
-  prescribedBy: "",
-  prescribedDate: "",
-  startDate: "",
-  endDate: "",
-};
 
 export function PatientMedications({ patientId }: PatientMedicationsProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingMedication, setEditingMedication] = useState<any>(null);
-  const [formData, setFormData] = useState<MedicationFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Query for medications
@@ -75,32 +71,31 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   const addMedication = useMutation(api.patientManagement.addPatientMedication);
   const updateMedication = useMutation(api.patientManagement.updatePatientMedication);
 
-  const handleFormChange = (field: keyof MedicationFormData, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleAddMedication = async () => {
-    if (!formData.medicationName || !formData.dosage || !formData.frequency) {
-      toast.error("Please fill in required fields");
-      return;
-    }
-
+  const handleAddMedication = async (data: MedicationFormData) => {
     try {
       setIsSubmitting(true);
       await addMedication({
         patientId: patientId as any,
-        medicationName: formData.medicationName,
-        dosage: formData.dosage,
-        frequency: formData.frequency,
-        instructions: formData.instructions || undefined,
-        prescribedBy: formData.prescribedBy || undefined,
-        prescribedDate: formData.prescribedDate || undefined,
-        startDate: formData.startDate || undefined,
-        endDate: formData.endDate || undefined,
+        medicationName: data.medicationName,
+        dosage: data.dosage,
+        frequency: data.frequency,
+        instructions: data.instructions || undefined,
+        prescribedBy: data.prescribedBy || undefined,
+        prescribedDate: data.prescribedDate || undefined,
+        startDate: data.startDate || undefined,
+        endDate: data.endDate || undefined,
+        // FDA NDC fields
+        fdaNdc: data.fdaNdc || undefined,
+        genericName: data.genericName || undefined,
+        brandName: data.brandName || undefined,
+        dosageForm: data.dosageForm || undefined,
+        route: data.route || undefined,
+        manufacturer: data.manufacturer || undefined,
+        activeIngredient: data.activeIngredient || undefined,
+        strength: data.strength || undefined,
       });
       
       toast.success("Medication added successfully");
-      setFormData(initialFormData);
       setIsAddDialogOpen(false);
     } catch (error) {
       toast.error("Failed to add medication");
@@ -110,29 +105,34 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
     }
   };
 
-  const handleEditMedication = async () => {
-    if (!editingMedication || !formData.medicationName || !formData.dosage || !formData.frequency) {
-      toast.error("Please fill in required fields");
-      return;
-    }
+  const handleEditMedication = async (data: MedicationFormData) => {
+    if (!editingMedication) return;
 
     try {
       setIsSubmitting(true);
       await updateMedication({
         medicationId: editingMedication._id,
-        medicationName: formData.medicationName,
-        dosage: formData.dosage,
-        frequency: formData.frequency,
-        instructions: formData.instructions || undefined,
-        prescribedBy: formData.prescribedBy || undefined,
-        prescribedDate: formData.prescribedDate || undefined,
-        startDate: formData.startDate || undefined,
-        endDate: formData.endDate || undefined,
+        medicationName: data.medicationName,
+        dosage: data.dosage,
+        frequency: data.frequency,
+        instructions: data.instructions || undefined,
+        prescribedBy: data.prescribedBy || undefined,
+        prescribedDate: data.prescribedDate || undefined,
+        startDate: data.startDate || undefined,
+        endDate: data.endDate || undefined,
+        // FDA NDC fields
+        fdaNdc: data.fdaNdc || undefined,
+        genericName: data.genericName || undefined,
+        brandName: data.brandName || undefined,
+        dosageForm: data.dosageForm || undefined,
+        route: data.route || undefined,
+        manufacturer: data.manufacturer || undefined,
+        activeIngredient: data.activeIngredient || undefined,
+        strength: data.strength || undefined,
       });
       
       toast.success("Medication updated successfully");
       setEditingMedication(null);
-      setFormData(initialFormData);
     } catch (error) {
       toast.error("Failed to update medication");
       console.error(error);
@@ -154,20 +154,6 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
     }
   };
 
-  const openEditDialog = (medication: any) => {
-    setEditingMedication(medication);
-    setFormData({
-      medicationName: medication.medicationName,
-      dosage: medication.dosage,
-      frequency: medication.frequency,
-      instructions: medication.instructions || "",
-      prescribedBy: medication.prescribedBy || "",
-      prescribedDate: medication.prescribedDate || "",
-      startDate: medication.startDate || "",
-      endDate: medication.endDate || "",
-    });
-  };
-
   const formatDate = (dateString?: string) => {
     if (!dateString) return "";
     const date = new Date(dateString);
@@ -187,92 +173,26 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
     return true;
   };
 
-  const MedicationForm = () => (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="medicationName">Medication Name *</Label>
-          <Input
-            id="medicationName"
-            placeholder="Enter medication name"
-            value={formData.medicationName}
-            onChange={(e) => handleFormChange("medicationName", e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="dosage">Dosage *</Label>
-          <Input
-            id="dosage"
-            placeholder="e.g., 500mg, 1 tablet"
-            value={formData.dosage}
-            onChange={(e) => handleFormChange("dosage", e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="frequency">Frequency *</Label>
-          <Input
-            id="frequency"
-            placeholder="e.g., Twice daily, Every 8 hours"
-            value={formData.frequency}
-            onChange={(e) => handleFormChange("frequency", e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="prescribedBy">Prescribed By</Label>
-          <Input
-            id="prescribedBy"
-            placeholder="Doctor's name"
-            value={formData.prescribedBy}
-            onChange={(e) => handleFormChange("prescribedBy", e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="instructions">Instructions</Label>
-        <Textarea
-          id="instructions"
-          placeholder="Special instructions for taking this medication"
-          value={formData.instructions}
-          onChange={(e) => handleFormChange("instructions", e.target.value)}
-          rows={3}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="prescribedDate">Prescribed Date</Label>
-          <Input
-            id="prescribedDate"
-            type="date"
-            value={formData.prescribedDate}
-            onChange={(e) => handleFormChange("prescribedDate", e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="startDate">Start Date</Label>
-          <Input
-            id="startDate"
-            type="date"
-            value={formData.startDate}
-            onChange={(e) => handleFormChange("startDate", e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="endDate">End Date</Label>
-          <Input
-            id="endDate"
-            type="date"
-            value={formData.endDate}
-            onChange={(e) => handleFormChange("endDate", e.target.value)}
-          />
-        </div>
-      </div>
-    </div>
-  );
+  const getEditInitialData = (medication: any): Partial<MedicationFormData> => {
+    return {
+      medicationName: medication.medicationName,
+      dosage: medication.dosage,
+      frequency: medication.frequency,
+      instructions: medication.instructions || "",
+      prescribedBy: medication.prescribedBy || "",
+      prescribedDate: medication.prescribedDate || "",
+      startDate: medication.startDate || "",
+      endDate: medication.endDate || "",
+      fdaNdc: medication.fdaNdc || "",
+      genericName: medication.genericName || "",
+      brandName: medication.brandName || "",
+      dosageForm: medication.dosageForm || "",
+      route: medication.route || "",
+      manufacturer: medication.manufacturer || "",
+      activeIngredient: medication.activeIngredient || "",
+      strength: medication.strength || "",
+    };
+  };
 
   return (
     <div className="space-y-6">
@@ -293,22 +213,18 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                 Add Medication
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Medication</DialogTitle>
-                                 <DialogDescription>
-                   Add a new medication to this patient&apos;s record
-                 </DialogDescription>
+                <DialogDescription>
+                  Add a new medication using FDA database search or manual entry
+                </DialogDescription>
               </DialogHeader>
-              <MedicationForm />
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddMedication} disabled={isSubmitting}>
-                  {isSubmitting ? "Adding..." : "Add Medication"}
-                </Button>
-              </DialogFooter>
+              <MedicationForm
+                onSubmit={handleAddMedication}
+                onCancel={() => setIsAddDialogOpen(false)}
+                isLoading={isSubmitting}
+              />
             </DialogContent>
           </Dialog>
         </div>
@@ -319,13 +235,13 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Pill className="h-12 w-12 text-muted-foreground mb-4" />
-                         <p className="text-lg font-medium text-muted-foreground">No medications found</p>
-             <p className="text-sm text-muted-foreground">Add medications to track patient&apos;s treatment</p>
+            <p className="text-lg font-medium text-muted-foreground">No medications found</p>
+            <p className="text-sm text-muted-foreground">Add medications to track patient&apos;s treatment</p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-4">
-                     {medications?.map((medication: any) => (
+          {medications?.map((medication: any) => (
             <Card key={medication._id} className={!isMedicationActive(medication) ? "opacity-60" : ""}>
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
@@ -350,6 +266,12 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                         <Building2 className="h-3 w-3 mr-1" />
                         {medication.organization?.name}
                       </Badge>
+                      {medication.fdaNdc && (
+                        <Badge variant="outline" className="text-blue-600">
+                          <FlaskConical className="h-3 w-3 mr-1" />
+                          FDA Verified
+                        </Badge>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -358,35 +280,29 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                       onOpenChange={(open) => {
                         if (!open) {
                           setEditingMedication(null);
-                          setFormData(initialFormData);
                         }
                       }}
                     >
                       <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={() => openEditDialog(medication)}>
+                        <Button variant="outline" size="sm" onClick={() => setEditingMedication(medication)}>
                           <Edit className="h-3 w-3 mr-1" />
                           Edit
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-2xl">
+                      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                           <DialogTitle>Edit Medication</DialogTitle>
                           <DialogDescription>
                             Update medication details
                           </DialogDescription>
                         </DialogHeader>
-                        <MedicationForm />
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => {
-                            setEditingMedication(null);
-                            setFormData(initialFormData);
-                          }}>
-                            Cancel
-                          </Button>
-                          <Button onClick={handleEditMedication} disabled={isSubmitting}>
-                            {isSubmitting ? "Updating..." : "Update Medication"}
-                          </Button>
-                        </DialogFooter>
+                        <MedicationForm
+                          initialData={getEditInitialData(medication)}
+                          onSubmit={handleEditMedication}
+                          onCancel={() => setEditingMedication(null)}
+                          isLoading={isSubmitting}
+                          isEdit={true}
+                        />
                       </DialogContent>
                     </Dialog>
                     {isMedicationActive(medication) && (
@@ -406,6 +322,12 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                     <p className="text-muted-foreground mb-1">Dosage & Frequency</p>
                     <p className="font-medium">{medication.dosage}</p>
                     <p className="text-muted-foreground">{medication.frequency}</p>
+                    {medication.route && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        <Layers className="h-3 w-3 inline mr-1" />
+                        {medication.route}
+                      </p>
+                    )}
                   </div>
 
                   {medication.prescribedBy && (
@@ -439,6 +361,57 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                     </div>
                   </div>
                 </div>
+
+                {/* FDA Information */}
+                {(medication.fdaNdc || medication.genericName || medication.brandName || medication.manufacturer) && (
+                  <>
+                    <Separator className="my-4" />
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm font-medium text-blue-900 mb-2 flex items-center gap-2">
+                        <FlaskConical className="h-4 w-4" />
+                        FDA Database Information
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                        {medication.fdaNdc && (
+                          <div>
+                            <p className="text-blue-600 font-medium">NDC Code</p>
+                            <p className="text-blue-800">{medication.fdaNdc}</p>
+                          </div>
+                        )}
+                        {medication.genericName && (
+                          <div>
+                            <p className="text-blue-600 font-medium">Generic Name</p>
+                            <p className="text-blue-800">{medication.genericName}</p>
+                          </div>
+                        )}
+                        {medication.brandName && (
+                          <div>
+                            <p className="text-blue-600 font-medium">Brand Name</p>
+                            <p className="text-blue-800">{medication.brandName}</p>
+                          </div>
+                        )}
+                        {medication.manufacturer && (
+                          <div>
+                            <p className="text-blue-600 font-medium">Manufacturer</p>
+                            <p className="text-blue-800">{medication.manufacturer}</p>
+                          </div>
+                        )}
+                        {medication.activeIngredient && (
+                          <div>
+                            <p className="text-blue-600 font-medium">Active Ingredient</p>
+                            <p className="text-blue-800">{medication.activeIngredient}</p>
+                          </div>
+                        )}
+                        {medication.dosageForm && (
+                          <div>
+                            <p className="text-blue-600 font-medium">Dosage Form</p>
+                            <p className="text-blue-800">{medication.dosageForm}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
 
                 {medication.instructions && (
                   <>

@@ -333,7 +333,7 @@ export const getPatientAccessGrants = query({
 
 // MEDICATION MANAGEMENT
 
-// Add medication to a patient
+// Add medication to a patient with FDA NDC support
 export const addPatientMedication = mutation({
   args: {
     patientId: v.id("patients"),
@@ -345,6 +345,15 @@ export const addPatientMedication = mutation({
     prescribedDate: v.optional(v.string()),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
+    // FDA NDC fields
+    fdaNdc: v.optional(v.string()),
+    genericName: v.optional(v.string()),
+    brandName: v.optional(v.string()),
+    dosageForm: v.optional(v.string()),
+    route: v.optional(v.string()),
+    manufacturer: v.optional(v.string()),
+    activeIngredient: v.optional(v.string()),
+    strength: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -378,6 +387,15 @@ export const addPatientMedication = mutation({
       prescribedDate: args.prescribedDate,
       startDate: args.startDate,
       endDate: args.endDate,
+      // FDA NDC fields
+      fdaNdc: args.fdaNdc,
+      genericName: args.genericName,
+      brandName: args.brandName,
+      dosageForm: args.dosageForm,
+      route: args.route,
+      manufacturer: args.manufacturer,
+      activeIngredient: args.activeIngredient,
+      strength: args.strength,
       isActive: true,
       addedBy: userProfile._id,
       addedAt: Date.now(),
@@ -385,7 +403,7 @@ export const addPatientMedication = mutation({
   },
 });
 
-// Update medication
+// Update medication with FDA NDC support
 export const updatePatientMedication = mutation({
   args: {
     medicationId: v.id("patientMedications"),
@@ -398,6 +416,15 @@ export const updatePatientMedication = mutation({
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
+    // FDA NDC fields
+    fdaNdc: v.optional(v.string()),
+    genericName: v.optional(v.string()),
+    brandName: v.optional(v.string()),
+    dosageForm: v.optional(v.string()),
+    route: v.optional(v.string()),
+    manufacturer: v.optional(v.string()),
+    activeIngredient: v.optional(v.string()),
+    strength: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -433,6 +460,15 @@ export const updatePatientMedication = mutation({
     if (args.startDate !== undefined) updates.startDate = args.startDate;
     if (args.endDate !== undefined) updates.endDate = args.endDate;
     if (args.isActive !== undefined) updates.isActive = args.isActive;
+    // FDA NDC fields
+    if (args.fdaNdc !== undefined) updates.fdaNdc = args.fdaNdc;
+    if (args.genericName !== undefined) updates.genericName = args.genericName;
+    if (args.brandName !== undefined) updates.brandName = args.brandName;
+    if (args.dosageForm !== undefined) updates.dosageForm = args.dosageForm;
+    if (args.route !== undefined) updates.route = args.route;
+    if (args.manufacturer !== undefined) updates.manufacturer = args.manufacturer;
+    if (args.activeIngredient !== undefined) updates.activeIngredient = args.activeIngredient;
+    if (args.strength !== undefined) updates.strength = args.strength;
 
     await ctx.db.patch(args.medicationId, updates);
   },

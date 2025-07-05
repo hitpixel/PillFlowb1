@@ -169,7 +169,7 @@ export const getPatient = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return { error: "User not authenticated", patient: null };
     }
 
     // Get user profile to find organization
@@ -179,19 +179,19 @@ export const getPatient = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization to view patients");
+      return { error: "User must be part of an organization to view patients", patient: null };
     }
 
     const patient = await ctx.db.get(args.id);
     
     if (!patient) {
-      throw new Error("Patient not found");
+      return { error: "Patient not found", patient: null };
     }
 
     // Check if user has access to this patient
     const hasAccess = await checkPatientAccess(ctx, args.id, userProfile._id);
     if (!hasAccess) {
-      throw new Error("Access denied: No access to this patient");
+      return { error: "Access denied: You don't have permission to view this patient", patient: null };
     }
 
     // Get patient's organization for context
@@ -220,13 +220,16 @@ export const getPatient = query({
     }
 
     return {
-      ...patient,
-      organizationName: patientOrg?.name,
-      organizationType: patientOrg?.type,
-      accessType: isSameOrganization ? "same_organization" : "cross_organization",
-      isShared: !isSameOrganization,
-      permissions: accessInfo?.permissions || (isSameOrganization ? ["view", "edit", "comment", "view_medications"] : ["view"]),
-      expiresAt: accessInfo?.expiresAt,
+      error: null,
+      patient: {
+        ...patient,
+        organizationName: patientOrg?.name,
+        organizationType: patientOrg?.type,
+        accessType: isSameOrganization ? "same_organization" : "cross_organization",
+        isShared: !isSameOrganization,
+        permissions: accessInfo?.permissions || (isSameOrganization ? ["view", "edit", "comment", "view_medications"] : ["view"]),
+        expiresAt: accessInfo?.expiresAt,
+      }
     };
   },
 });

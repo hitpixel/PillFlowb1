@@ -210,7 +210,7 @@ export default defineSchema({
     .index("by_expiry", ["expiresAt"])
     .index("by_active", ["isActive"]),
 
-  // Patient medications
+  // Patient medications with FDA NDC support
   patientMedications: defineTable({
     patientId: v.id("patients"),
     organizationId: v.id("organizations"), // Which org added this medication
@@ -222,6 +222,15 @@ export default defineSchema({
     prescribedDate: v.optional(v.string()), // YYYY-MM-DD format
     startDate: v.optional(v.string()), // YYYY-MM-DD format
     endDate: v.optional(v.string()), // YYYY-MM-DD format
+    // FDA NDC fields
+    fdaNdc: v.optional(v.string()), // FDA National Drug Code
+    genericName: v.optional(v.string()), // Generic medication name
+    brandName: v.optional(v.string()), // Brand name
+    dosageForm: v.optional(v.string()), // Tablet, capsule, etc.
+    route: v.optional(v.string()), // Oral, topical, etc.
+    manufacturer: v.optional(v.string()), // Manufacturer name
+    activeIngredient: v.optional(v.string()), // Active ingredient
+    strength: v.optional(v.string()), // Strength/concentration
     isActive: v.boolean(),
     addedBy: v.id("userProfiles"),
     addedAt: v.float64(),

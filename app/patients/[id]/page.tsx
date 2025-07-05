@@ -40,9 +40,15 @@ export default function PatientDetailPage() {
   const router = useRouter();
   const patientId = params.id as Id<"patients">;
   
-  const patient = useQuery(api.patients.getPatient, { id: patientId });
+  const patientResult = useQuery(api.patients.getPatient, { id: patientId });
   const updatePatient = useMutation(api.patients.updatePatient);
   const deletePatient = useMutation(api.patients.deletePatient);
+  
+  const [accessDenied, setAccessDenied] = useState(false);
+
+  // Extract patient data and handle errors
+  const patient = patientResult?.patient || null;
+  const patientError = patientResult?.error || null;
   
   const [isEditing, setIsEditing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -78,6 +84,18 @@ export default function PatientDetailPage() {
       });
     }
   }, [patient]);
+
+  // Handle access errors gracefully
+  useEffect(() => {
+    if (patientError && !accessDenied) {
+      toast.error(patientError);
+      setAccessDenied(true);
+      // Redirect back to patients list after showing error
+      setTimeout(() => {
+        router.push("/patients");
+      }, 2000);
+    }
+  }, [patientError, accessDenied, router]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -247,7 +265,7 @@ export default function PatientDetailPage() {
     { value: "ACT", label: "Australian Capital Territory" },
   ];
 
-  if (patient === undefined) {
+  if (patientResult === undefined) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -255,12 +273,14 @@ export default function PatientDetailPage() {
     );
   }
 
-  if (patient === null) {
+  if (patientError || !patient) {
     return (
       <div className="p-6 text-center">
-        <h1 className="text-2xl font-bold text-red-600 mb-4">Patient Not Found</h1>
+        <h1 className="text-2xl font-bold text-red-600 mb-4">
+          {patientError ? "Access Denied" : "Patient Not Found"}
+        </h1>
         <p className="text-muted-foreground mb-4">
-          The patient you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.
+          {patientError || "The patient you're looking for doesn't exist or you don't have permission to view it."}
         </p>
         <Link href="/patients">
           <Button>
