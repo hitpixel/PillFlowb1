@@ -19,7 +19,10 @@ import {
   AlertTriangle,
   Plus,
   Trash2,
-  Calendar
+  Calendar,
+  CheckCircle,
+  XCircle,
+  AlertCircle
 } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -47,6 +50,8 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
 
   // Mutations
   const revokeAccess = useMutation(api.patientManagement.revokeTokenAccess);
+  const approveAccess = useMutation(api.patientManagement.approveTokenAccess);
+  const denyAccess = useMutation(api.patientManagement.denyTokenAccess);
 
   const handleGrantAccess = async () => {
     if (!grantFormData.userEmail) {
@@ -85,6 +90,32 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
       toast.success("Access revoked successfully");
     } catch (error) {
       toast.error("Failed to revoke access");
+      console.error(error);
+    }
+  };
+
+  const handleApproveAccess = async (accessGrantId: string) => {
+    try {
+      await approveAccess({
+        accessGrantId: accessGrantId as Id<"tokenAccessGrants">,
+        permissions: ["view", "comment", "view_medications"], // Default permissions
+        expiresInDays: 7, // Default 7 days
+      });
+      toast.success("Access approved successfully");
+    } catch (error) {
+      toast.error("Failed to approve access");
+      console.error(error);
+    }
+  };
+
+  const handleDenyAccess = async (accessGrantId: string) => {
+    try {
+      await denyAccess({
+        accessGrantId: accessGrantId as Id<"tokenAccessGrants">,
+      });
+      toast.success("Access denied");
+    } catch (error) {
+      toast.error("Failed to deny access");
       console.error(error);
     }
   };
@@ -132,6 +163,41 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
     if (!expiresAt) return "Never expires";
     if (isExpired(expiresAt)) return "Expired";
     return `Expires ${formatDistanceToNow(new Date(expiresAt), { addSuffix: true })}`;
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending":
+        return (
+          <Badge variant="outline" className="border-yellow-200 bg-yellow-50 text-yellow-800">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Pending
+          </Badge>
+        );
+      case "approved":
+        return (
+          <Badge variant="outline" className="border-green-200 bg-green-50 text-green-800">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Approved
+          </Badge>
+        );
+      case "denied":
+        return (
+          <Badge variant="outline" className="border-red-200 bg-red-50 text-red-800">
+            <XCircle className="h-3 w-3 mr-1" />
+            Denied
+          </Badge>
+        );
+      case "revoked":
+        return (
+          <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-800">
+            <Trash2 className="h-3 w-3 mr-1" />
+            Revoked
+          </Badge>
+        );
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
   };
 
   return (
@@ -223,6 +289,68 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
         </CardContent>
       </Card>
 
+      {/* Pending Access Requests */}
+      {accessGrants?.some((grant: any) => grant.status === "pending") && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-yellow-600" />
+              Pending Access Requests
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {accessGrants
+                ?.filter((grant: any) => grant.status === "pending")
+                .map((grant: any) => (
+                  <div key={grant._id} className="border rounded-lg p-4 bg-yellow-50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4 text-yellow-600" />
+                          <span className="font-medium">
+                            {grant.grantedToUser?.firstName} {grant.grantedToUser?.lastName}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            ({grant.grantedToUser?.email})
+                          </span>
+                        </div>
+                        <Badge variant="outline">
+                          {grant.grantedToOrg?.name}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(grant.status)}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleApproveAccess(grant._id)}
+                          className="border-green-200 text-green-700 hover:bg-green-50"
+                        >
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Approve
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDenyAccess(grant._id)}
+                          className="border-red-200 text-red-700 hover:bg-red-50"
+                        >
+                          <XCircle className="h-3 w-3 mr-1" />
+                          Deny
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Requested {formatDistanceToNow(new Date(grant.requestedAt), { addSuffix: true })}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Current Access Grants */}
       <Card>
         <CardHeader>
@@ -232,80 +360,100 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {accessGrants?.length === 0 ? (
+          {accessGrants?.filter((grant: any) => grant.status !== "pending").length === 0 ? (
             <div className="text-center py-8">
               <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No access grants found</p>
               <p className="text-sm text-muted-foreground">
-                                 Grant access to other users to share this patient&apos;s data
+                Grant access to other users to share this patient&apos;s data
               </p>
             </div>
           ) : (
             <div className="space-y-4">
-                             {accessGrants?.map((grant: any) => (
-                <div key={grant._id} className="border rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
+              {accessGrants
+                ?.filter((grant: any) => grant.status !== "pending")
+                .map((grant: any) => (
+                  <div key={grant._id} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <UserCheck className="h-4 w-4 text-green-600" />
+                          <span className="font-medium">
+                            {grant.grantedToUser?.firstName} {grant.grantedToUser?.lastName}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            ({grant.grantedToUser?.email})
+                          </span>
+                        </div>
+                        <Badge variant="outline">
+                          {grant.grantedToOrg?.name}
+                        </Badge>
+                      </div>
                       <div className="flex items-center gap-2">
-                        <UserCheck className="h-4 w-4 text-green-600" />
-                        <span className="font-medium">
-                          {grant.grantedToUser?.firstName} {grant.grantedToUser?.lastName}
-                        </span>
-                      </div>
-                      <Badge variant="outline">
-                        {grant.grantedToOrg?.name}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isExpired(grant.expiresAt) ? (
-                        <Badge variant="destructive">
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                          Expired
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Active
-                        </Badge>
-                      )}
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleRevokeAccess(grant._id)}
-                      >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Revoke
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground mb-1">Permissions</p>
-                      <div className="flex flex-wrap gap-1">
-                                                 {grant.permissions.map((permission: string) => (
-                          <Badge key={permission} variant="outline" className="text-xs">
-                            {getPermissionIcon(permission)}
-                            <span className="ml-1">{getPermissionLabel(permission)}</span>
+                        {getStatusBadge(grant.status)}
+                        {isExpired(grant.expiresAt) ? (
+                          <Badge variant="destructive">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            Expired
                           </Badge>
-                        ))}
+                        ) : grant.status === "approved" ? (
+                          <Badge variant="secondary">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Active
+                          </Badge>
+                        ) : null}
+                        {(grant.status === "approved" && grant.isActive) && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleRevokeAccess(grant._id)}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Revoke
+                          </Button>
+                        )}
                       </div>
                     </div>
-                    <div>
-                      <p className="text-muted-foreground mb-1">Access Details</p>
-                      <div className="space-y-1">
-                        <p className="text-xs">
-                          <Calendar className="h-3 w-3 inline mr-1" />
-                          {getExpiryStatus(grant.expiresAt)}
-                        </p>
-                        <p className="text-xs">
-                          Granted {formatDistanceToNow(new Date(grant.grantedAt), { addSuffix: true })}
-                        </p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground mb-1">Permissions</p>
+                        <div className="flex flex-wrap gap-1">
+                          {grant.permissions.map((permission: string) => (
+                            <Badge key={permission} variant="outline" className="text-xs">
+                              {getPermissionIcon(permission)}
+                              <span className="ml-1">{getPermissionLabel(permission)}</span>
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">Access Details</p>
+                        <div className="space-y-1">
+                          <p className="text-xs">
+                            <Calendar className="h-3 w-3 inline mr-1" />
+                            {getExpiryStatus(grant.expiresAt)}
+                          </p>
+                          {grant.grantedAt && (
+                            <p className="text-xs">
+                              Granted {formatDistanceToNow(new Date(grant.grantedAt), { addSuffix: true })}
+                            </p>
+                          )}
+                          {grant.status === "denied" && grant.deniedAt && (
+                            <p className="text-xs text-red-600">
+                              Denied {formatDistanceToNow(new Date(grant.deniedAt), { addSuffix: true })}
+                            </p>
+                          )}
+                          {grant.status === "revoked" && grant.revokedAt && (
+                            <p className="text-xs text-gray-600">
+                              Revoked {formatDistanceToNow(new Date(grant.revokedAt), { addSuffix: true })}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
         </CardContent>

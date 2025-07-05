@@ -4,7 +4,156 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 
 // TOKEN ACCESS MANAGEMENT
 
-// Grant access to a patient's data
+// Request access via share token (creates pending request)
+export const requestTokenAccess = mutation({
+  args: {
+    shareToken: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) throw new Error("User profile not found");
+
+    // Get patient by share token
+    const patient = await ctx.db
+      .query("patients")
+      .withIndex("by_share_token", (q) => q.eq("shareToken", args.shareToken))
+      .first();
+
+    if (!patient) throw new Error("Invalid share token");
+
+    // Check if access already exists
+    const existingAccess = await ctx.db
+      .query("tokenAccessGrants")
+      .withIndex("by_patient", (q) => q.eq("patientId", patient._id))
+      .filter((q) => q.eq(q.field("grantedTo"), userProfile._id))
+      .filter((q) => q.neq(q.field("status"), "denied"))
+      .first();
+
+    if (existingAccess) {
+      if (existingAccess.status === "approved" && existingAccess.isActive) {
+        throw new Error("You already have active access to this patient");
+      }
+      if (existingAccess.status === "pending") {
+        throw new Error("Your access request is already pending approval");
+      }
+    }
+
+    const accessType = patient.organizationId === userProfile.organizationId 
+      ? "same_organization" 
+      : "cross_organization";
+
+    // Create pending access request
+    return await ctx.db.insert("tokenAccessGrants", {
+      patientId: patient._id,
+      shareToken: args.shareToken,
+      grantedTo: userProfile._id,
+      grantedToOrg: userProfile.organizationId!,
+      grantedByOrg: patient.organizationId,
+      accessType,
+      status: accessType === "same_organization" ? "approved" : "pending",
+      permissions: ["view", "comment", "view_medications"], // Default permissions
+      isActive: accessType === "same_organization",
+      requestedAt: Date.now(),
+      grantedAt: accessType === "same_organization" ? Date.now() : undefined,
+    });
+  },
+});
+
+// Approve pending access request
+export const approveTokenAccess = mutation({
+  args: {
+    accessGrantId: v.id("tokenAccessGrants"),
+    permissions: v.array(v.union(
+      v.literal("view"),
+      v.literal("comment"),
+      v.literal("view_medications")
+    )),
+    expiresInDays: v.optional(v.number()), // null means never expires
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) throw new Error("User profile not found");
+
+    const accessGrant = await ctx.db.get(args.accessGrantId);
+    if (!accessGrant) throw new Error("Access grant not found");
+
+    // Verify user has permission to approve (must be from same org as patient)
+    if (accessGrant.grantedByOrg !== userProfile.organizationId) {
+      throw new Error("Unauthorized: Cannot approve access for this patient");
+    }
+
+    if (accessGrant.status !== "pending") {
+      throw new Error("Access request is not pending");
+    }
+
+    // Calculate expiry date
+    const expiresAt = args.expiresInDays 
+      ? Date.now() + (args.expiresInDays * 24 * 60 * 60 * 1000)
+      : undefined;
+
+    await ctx.db.patch(args.accessGrantId, {
+      status: "approved",
+      permissions: args.permissions,
+      expiresAt,
+      grantedBy: userProfile._id,
+      grantedAt: Date.now(),
+      isActive: true,
+    });
+  },
+});
+
+// Deny pending access request
+export const denyTokenAccess = mutation({
+  args: {
+    accessGrantId: v.id("tokenAccessGrants"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Authentication required");
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) throw new Error("User profile not found");
+
+    const accessGrant = await ctx.db.get(args.accessGrantId);
+    if (!accessGrant) throw new Error("Access grant not found");
+
+    // Verify user has permission to deny (must be from same org as patient)
+    if (accessGrant.grantedByOrg !== userProfile.organizationId) {
+      throw new Error("Unauthorized: Cannot deny access for this patient");
+    }
+
+    if (accessGrant.status !== "pending") {
+      throw new Error("Access request is not pending");
+    }
+
+    await ctx.db.patch(args.accessGrantId, {
+      status: "denied",
+      deniedBy: userProfile._id,
+      deniedAt: Date.now(),
+      isActive: false,
+    });
+  },
+});
+
+// Grant access to a patient's data (direct grant)
 export const grantTokenAccess = mutation({
   args: {
     patientId: v.id("patients"),
@@ -59,6 +208,7 @@ export const grantTokenAccess = mutation({
         expiresAt,
         grantedBy: userProfile._id,
         grantedAt: Date.now(),
+        status: "approved",
       });
       return existingAccess._id;
     }
@@ -76,9 +226,11 @@ export const grantTokenAccess = mutation({
       grantedBy: userProfile._id,
       grantedByOrg: userProfile.organizationId!,
       accessType,
+      status: "approved",
       permissions: args.permissions,
       expiresAt,
       isActive: true,
+      requestedAt: Date.now(),
       grantedAt: Date.now(),
     });
   },
@@ -112,6 +264,7 @@ export const revokeTokenAccess = mutation({
     }
 
     await ctx.db.patch(args.accessGrantId, {
+      status: "revoked",
       isActive: false,
       revokedAt: Date.now(),
       revokedBy: userProfile._id,
@@ -146,7 +299,6 @@ export const getPatientAccessGrants = query({
     const accessGrants = await ctx.db
       .query("tokenAccessGrants")
       .withIndex("by_patient", (q) => q.eq("patientId", args.patientId))
-      .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
 
     // Enrich with user and organization details
@@ -154,7 +306,7 @@ export const getPatientAccessGrants = query({
       accessGrants.map(async (grant) => {
         const grantedToUser = await ctx.db.get(grant.grantedTo);
         const grantedToOrg = await ctx.db.get(grant.grantedToOrg);
-        const grantedByUser = await ctx.db.get(grant.grantedBy);
+        const grantedByUser = grant.grantedBy ? await ctx.db.get(grant.grantedBy) : null;
 
         return {
           ...grant,
@@ -464,6 +616,7 @@ async function checkPatientAccess(ctx: any, patientId: any, userProfileId: any) 
     .query("tokenAccessGrants")
     .withIndex("by_patient", (q: any) => q.eq("patientId", patientId))
     .filter((q: any) => q.eq(q.field("grantedTo"), userProfileId))
+    .filter((q: any) => q.eq(q.field("status"), "approved"))
     .filter((q: any) => q.eq(q.field("isActive"), true))
     .first();
 
@@ -473,6 +626,7 @@ async function checkPatientAccess(ctx: any, patientId: any, userProfileId: any) 
   if (accessGrant.expiresAt && accessGrant.expiresAt < Date.now()) {
     // Automatically revoke expired access
     await ctx.db.patch(accessGrant._id, {
+      status: "revoked",
       isActive: false,
       revokedAt: Date.now(),
     });

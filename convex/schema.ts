@@ -178,11 +178,17 @@ export default defineSchema({
     shareToken: v.string(),
     grantedTo: v.id("userProfiles"),
     grantedToOrg: v.id("organizations"),
-    grantedBy: v.id("userProfiles"),
+    grantedBy: v.optional(v.id("userProfiles")), // null for share token requests
     grantedByOrg: v.id("organizations"),
     accessType: v.union(
       v.literal("same_organization"),
       v.literal("cross_organization")
+    ),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("denied"),
+      v.literal("revoked")
     ),
     permissions: v.array(v.union(
       v.literal("view"),
@@ -191,9 +197,12 @@ export default defineSchema({
     )),
     expiresAt: v.optional(v.float64()), // null means never expires
     isActive: v.boolean(),
-    grantedAt: v.float64(),
+    requestedAt: v.float64(), // When the access was requested
+    grantedAt: v.optional(v.float64()), // When it was approved
     revokedAt: v.optional(v.float64()),
     revokedBy: v.optional(v.id("userProfiles")),
+    deniedAt: v.optional(v.float64()),
+    deniedBy: v.optional(v.id("userProfiles")),
   })
     .index("by_patient", ["patientId"])
     .index("by_grantee", ["grantedTo"])
