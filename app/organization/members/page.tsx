@@ -13,7 +13,8 @@ import {
   Shield,
   Crown,
   Eye,
-  ChevronLeft
+  ChevronLeft,
+  Mail
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -93,6 +94,8 @@ export default function OrganizationMembersPage() {
   const updateMemberRole = useMutation(api.users.updateMemberRole);
   const removeMember = useMutation(api.users.removeMember);
   const cancelInvitation = useMutation(api.users.cancelInvitation);
+  const sendDirectInvitationEmail = useMutation(api.emails.sendInvitationEmailDirect);
+  const sendTestEmail = useMutation(api.emails.sendTestEmail);
   
   // State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,6 +106,7 @@ export default function OrganizationMembersPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "member" | "viewer">("member");
   const [createdInvite, setCreatedInvite] = useState<{token: string; email: string} | null>(null);
+  const [isEmailSending, setIsEmailSending] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -219,6 +223,105 @@ export default function OrganizationMembersPage() {
     navigator.clipboard.writeText(text);
     setSuccess("Copied to clipboard!");
     setTimeout(() => setSuccess(null), 2000);
+  };
+
+  const handleSendDirectEmail = async () => {
+    if (!createdInvite) {
+      setError("Please create an invitation first");
+      return;
+    }
+
+    if (!organization || !userProfile) {
+      setError("Organization or user profile not found");
+      return;
+    }
+    
+    setIsEmailSending(true);
+    setError(null);
+    
+    try {
+      console.log("🚀 Sending direct invitation email...");
+      const result = await sendDirectInvitationEmail({
+        inviteEmail: createdInvite.email,
+        organizationName: organization.name,
+        inviterName: `${userProfile.firstName} ${userProfile.lastName}`,
+        inviteToken: createdInvite.token,
+      });
+      
+      if (result.success) {
+        setSuccess(`✅ Email sent successfully to ${createdInvite.email}! Email ID: ${result.emailId}`);
+        console.log("✅ Direct email sent successfully:", result);
+      } else {
+        setError(`❌ Failed to send email: ${result.error}`);
+        console.error("❌ Direct email failed:", result);
+      }
+      
+      setTimeout(() => setSuccess(null), 7000);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to send email";
+      setError(`❌ Email sending failed: ${errorMessage}`);
+      console.error("❌ Direct email error:", error);
+    } finally {
+      setIsEmailSending(false);
+    }
+  };
+
+  const handleQuickSendEmail = async () => {
+    if (!inviteEmail.trim()) {
+      setError("Please enter an email address");
+      return;
+    }
+
+    if (!organization || !userProfile) {
+      setError("Organization or user profile not found");
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setError(null);
+    
+    try {
+      console.log("🚀 Quick send: Creating invitation and sending email...");
+      
+      // First create the invitation
+      const inviteResult = await createInvitation({
+        email: inviteEmail.trim(),
+        role: inviteRole,
+      });
+      
+      // Then send the email directly
+      const emailResult = await sendDirectInvitationEmail({
+        inviteEmail: inviteEmail.trim(),
+        organizationName: organization.name,
+        inviterName: `${userProfile.firstName} ${userProfile.lastName}`,
+        inviteToken: inviteResult.inviteToken,
+      });
+      
+      if (emailResult.success) {
+        setSuccess(`✅ Invitation created and email sent to ${inviteEmail}! Email ID: ${emailResult.emailId}`);
+        setInviteEmail("");
+        setInviteRole("member");
+        console.log("✅ Quick send successful:", emailResult);
+      } else {
+        // Even if email fails, we still created the invitation
+        setCreatedInvite({
+          token: inviteResult.inviteToken,
+          email: inviteEmail.trim(),
+        });
+        setError(`⚠️ Invitation created but email failed: ${emailResult.error}`);
+        setInviteEmail("");
+        setInviteRole("member");
+        console.error("❌ Quick send email failed:", emailResult);
+      }
+      
+      setTimeout(() => setSuccess(null), 7000);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to create invitation or send email";
+      setError(`❌ Quick send failed: ${errorMessage}`);
+      console.error("❌ Quick send error:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -363,11 +466,21 @@ export default function OrganizationMembersPage() {
             <CardHeader>
               <CardTitle>Invite New Member</CardTitle>
               <CardDescription>
-                Send an invitation to add a new team member
+                Send an invitation to add a new team member to your organization
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-4">
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-md mb-4">
+                <p className="text-sm text-blue-800 font-medium mb-2">
+                  🔐 Secure Invitation System
+                </p>
+                <p className="text-sm text-blue-700">
+                  All team members must be invited via email for security. 
+                  Use the invite form below to send secure invitation links to new team members.
+                </p>
+              </div>
+              
+              <div className="flex gap-4 mb-4">
                 <div className="flex-1">
                   <Input
                     placeholder="Enter email address"
@@ -381,42 +494,123 @@ export default function OrganizationMembersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="member">Member</SelectItem>
-                    <SelectItem value="viewer">Viewer</SelectItem>
+                    <SelectItem value="viewer">Viewer - View only access</SelectItem>
+                    <SelectItem value="member">Member - Standard access</SelectItem>
+                    <SelectItem value="admin">Admin - Full management access</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button onClick={handleInviteMember} disabled={isSubmitting}>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Invite
+              </div>
+              
+              <div className="flex flex-wrap gap-2 mb-4">
+                <Button onClick={handleInviteMember} disabled={isSubmitting} variant="outline">
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Create Invitation
+                    </>
+                  )}
+                </Button>
+                
+                <Button 
+                  onClick={handleQuickSendEmail} 
+                  disabled={isSubmitting}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Quick Send Email
+                    </>
+                  )}
                 </Button>
               </div>
               
               {createdInvite && (
                 <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <p className="font-medium text-green-800">Invitation Created!</p>
-                  <p className="text-sm text-green-700 mb-2">
-                    Send this token to {createdInvite.email}:
+                  <p className="font-medium text-green-800 mb-2">Invitation Created!</p>
+                  <p className="text-sm text-green-700 mb-3">
+                    Choose how to share this invitation with {createdInvite.email}:
                   </p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={createdInvite.token}
-                      readOnly
-                      className="font-mono text-sm"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => copyToClipboard(createdInvite.token)}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
+                  
+                  <div className="space-y-3">
+                    {/* Token copy option */}
+                    <div className="p-3 bg-white rounded border">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Option 1: Copy Token</p>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={createdInvite.token}
+                          readOnly
+                          className="font-mono text-sm"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyToClipboard(createdInvite.token)}
+                        >
+                          <Copy className="w-4 h-4 mr-1" />
+                          Copy
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Send this token to the user manually. They can enter it at the signup page.
+                      </p>
+                    </div>
+                    
+                    {/* Email sending option */}
+                    <div className="p-3 bg-white rounded border">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Option 2: Send Email</p>
+                      <Button
+                        onClick={handleSendDirectEmail}
+                        disabled={isEmailSending}
+                        className="w-full"
+                      >
+                        {isEmailSending ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Sending Email...
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="w-4 h-4 mr-2" />
+                            Send Email to {createdInvite.email}
+                          </>
+                        )}
+                      </Button>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Send the invitation directly to the user&apos;s email address using our improved email system.
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-green-600 mt-2">
+                  
+                  <p className="text-xs text-green-600 mt-3">
                     This invitation expires in 7 days
                   </p>
                 </div>
               )}
+              
+              <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+                <p className="text-sm text-blue-800">
+                  <strong>Three ways to invite users:</strong>
+                </p>
+                <ul className="text-sm text-blue-700 mt-2 space-y-1">
+                  <li><strong>• Quick Send Email:</strong> Creates invitation and sends email immediately</li>
+                  <li><strong>• Create Invitation:</strong> Generate token first, then choose copy or email</li>
+                  <li><strong>• Manual sharing:</strong> Copy token and share via SMS, phone, or in-person</li>
+                </ul>
+                <p className="text-sm text-blue-700 mt-2">
+                  The user can create a new account using the invitation token if they don&apos;t have one.
+                </p>
+              </div>
             </CardContent>
           </Card>
         )}

@@ -102,21 +102,7 @@ export default function OrganizationOverviewPage() {
   const invitations = useQuery(api.users.getPendingInvitations);
   const userProfile = useQuery(api.users.getCurrentUserProfile);
   
-  // State
-  const [success, setSuccess] = useState<string | null>(null);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"admin" | "member" | "viewer">("member");
-  const [isInviting, setIsInviting] = useState(false);
-  const [inviteError, setInviteError] = useState<string | null>(null);
-  const [createdInvite, setCreatedInvite] = useState<{token: string; email: string} | null>(null);
-  const [isEmailSending, setIsEmailSending] = useState(false);
-  
-  // Mutations
-  const createInvitation = useMutation(api.users.createMemberInvitation);
-  const sendDirectInvitationEmail = useMutation(api.emails.sendInvitationEmailDirect);
-  const sendTestEmail = useMutation(api.emails.sendTestEmail);
-  const sendTestInvitationEmail = useMutation(api.emails.sendTestInvitationEmail);
-  const debugEmailSystem = useMutation(api.emails.debugEmailSystem);
+
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -160,228 +146,9 @@ export default function OrganizationOverviewPage() {
 
 
 
-  const handleCreateInvitation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!inviteEmail.trim()) {
-      setInviteError("Please enter a valid email address");
-      return;
-    }
-    
-    setIsInviting(true);
-    setInviteError(null);
-    
-    try {
-      const result = await createInvitation({
-        email: inviteEmail.trim(),
-        role: inviteRole,
-      });
-      
-      setCreatedInvite({
-        token: result.inviteToken,
-        email: inviteEmail.trim(),
-      });
-      
-      setSuccess(`Invitation created for ${inviteEmail}!`);
-      setInviteEmail("");
-      setInviteRole("member");
-      setTimeout(() => setSuccess(null), 5000);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to create invitation";
-      setInviteError(errorMessage);
-    } finally {
-      setIsInviting(false);
-    }
-  };
 
-  const handleSendDirectEmail = async () => {
-    if (!createdInvite) {
-      setInviteError("Please create an invitation first");
-      return;
-    }
 
-    if (!organization || !userProfile) {
-      setInviteError("Organization or user profile not found");
-      return;
-    }
-    
-    setIsEmailSending(true);
-    setInviteError(null);
-    
-    try {
-      console.log("🚀 Sending direct invitation email...");
-      const result = await sendDirectInvitationEmail({
-        inviteEmail: createdInvite.email,
-        organizationName: organization.name,
-        inviterName: `${userProfile.firstName} ${userProfile.lastName}`,
-        inviteToken: createdInvite.token,
-      });
-      
-      if (result.success) {
-        setSuccess(`✅ Email sent successfully to ${createdInvite.email}! Email ID: ${result.emailId}`);
-        console.log("✅ Direct email sent successfully:", result);
-      } else {
-        setInviteError(`❌ Failed to send email: ${result.error}`);
-        console.error("❌ Direct email failed:", result);
-      }
-      
-      setTimeout(() => setSuccess(null), 7000);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to send email";
-      setInviteError(`❌ Email sending failed: ${errorMessage}`);
-      console.error("❌ Direct email error:", error);
-    } finally {
-      setIsEmailSending(false);
-    }
-  };
 
-  const handleQuickSendEmail = async () => {
-    if (!inviteEmail.trim()) {
-      setInviteError("Please enter an email address");
-      return;
-    }
-
-    if (!organization || !userProfile) {
-      setInviteError("Organization or user profile not found");
-      return;
-    }
-    
-    setIsInviting(true);
-    setInviteError(null);
-    
-    try {
-      console.log("🚀 Quick send: Creating invitation and sending email...");
-      
-      // First create the invitation
-      const inviteResult = await createInvitation({
-        email: inviteEmail.trim(),
-        role: inviteRole,
-      });
-      
-      // Then send the email directly
-      const emailResult = await sendDirectInvitationEmail({
-        inviteEmail: inviteEmail.trim(),
-        organizationName: organization.name,
-        inviterName: `${userProfile.firstName} ${userProfile.lastName}`,
-        inviteToken: inviteResult.inviteToken,
-      });
-      
-      if (emailResult.success) {
-        setSuccess(`✅ Invitation created and email sent to ${inviteEmail}! Email ID: ${emailResult.emailId}`);
-        setInviteEmail("");
-        setInviteRole("member");
-        console.log("✅ Quick send successful:", emailResult);
-      } else {
-        // Even if email fails, we still created the invitation
-        setCreatedInvite({
-          token: inviteResult.inviteToken,
-          email: inviteEmail.trim(),
-        });
-        setInviteError(`⚠️ Invitation created but email failed: ${emailResult.error}`);
-        setInviteEmail("");
-        setInviteRole("member");
-        console.error("❌ Quick send email failed:", emailResult);
-      }
-      
-      setTimeout(() => setSuccess(null), 7000);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to create invitation or send email";
-      setInviteError(`❌ Quick send failed: ${errorMessage}`);
-      console.error("❌ Quick send error:", error);
-    } finally {
-      setIsInviting(false);
-    }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setSuccess("Invitation token copied to clipboard!");
-    setTimeout(() => setSuccess(null), 2000);
-  };
-
-  const handleTestEmail = async () => {
-    if (!inviteEmail.trim()) {
-      setInviteError("Please enter an email address to test");
-      return;
-    }
-    
-    setIsInviting(true);
-    setInviteError(null);
-    
-    try {
-      const result = await sendTestEmail({
-        testEmail: inviteEmail.trim(),
-      });
-      
-      if (result.success) {
-        setSuccess(`Test email sent to ${inviteEmail}! Check your inbox.`);
-      } else {
-        setInviteError(`Test email failed: ${result.error}`);
-      }
-      setTimeout(() => setSuccess(null), 5000);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to send test email";
-      setInviteError(errorMessage);
-    } finally {
-      setIsInviting(false);
-    }
-  };
-
-  const handleTestInvitationEmail = async () => {
-    if (!inviteEmail.trim()) {
-      setInviteError("Please enter an email address to test");
-      return;
-    }
-    
-    setIsInviting(true);
-    setInviteError(null);
-    
-    try {
-      const result = await sendTestInvitationEmail({
-        testEmail: inviteEmail.trim(),
-      });
-      
-      if (result.success) {
-        setSuccess(`Test invitation email sent to ${inviteEmail}! Check your inbox.`);
-      } else {
-        setInviteError(`Test invitation email failed: ${result.error}`);
-      }
-      setTimeout(() => setSuccess(null), 5000);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to send test invitation email";
-      setInviteError(errorMessage);
-    } finally {
-      setIsInviting(false);
-    }
-  };
-
-  const handleDebugEmail = async () => {
-    if (!inviteEmail.trim()) {
-      setInviteError("Please enter an email address to debug");
-      return;
-    }
-    
-    setIsInviting(true);
-    setInviteError(null);
-    
-    try {
-      const result = await debugEmailSystem({
-        testEmail: inviteEmail.trim(),
-      });
-      
-      if (result.success) {
-        setSuccess(`Debug email sent to ${inviteEmail}! Check console logs and your inbox.`);
-      } else {
-        setInviteError(`Debug email failed: ${result.error}`);
-      }
-      setTimeout(() => setSuccess(null), 5000);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "Failed to send debug email";
-      setInviteError(errorMessage);
-    } finally {
-      setIsInviting(false);
-    }
-  };
 
   const canEdit = userProfile?.role === "owner" || userProfile?.role === "admin";
 
@@ -445,12 +212,7 @@ export default function OrganizationOverviewPage() {
               </div>
             </div>
 
-        {/* Success Message */}
-        {success && (
-          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
-            {success}
-          </div>
-        )}
+
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -578,212 +340,28 @@ export default function OrganizationOverviewPage() {
             <CardHeader>
               <CardTitle>Team Management</CardTitle>
               <CardDescription>
-                Invite new members to join your organization
+                Manage your organization's team members
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
                 <p className="text-sm text-blue-800 font-medium mb-2">
-                  🔐 Secure Invitation System
+                  👥 Team Overview
                 </p>
                 <p className="text-sm text-blue-700">
-                  All team members must be invited via email for security. 
-                  Use the invite form below to send secure invitation links to new team members.
+                  View and manage all team members, their roles, and invite new members to join your organization.
                 </p>
+              </div>
+              <div className="text-center">
+                <Button asChild>
+                  <Link href="/organization/members">
+                    <Users className="w-4 h-4 mr-2" />
+                    Manage Team Members
+                  </Link>
+                </Button>
               </div>
             </CardContent>
           </Card>
-
-          {/* Invite New Member */}
-          {canEdit && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Invite New Member</CardTitle>
-                <CardDescription>
-                  Send an invitation to add a new team member to your organization
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleCreateInvitation} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="inviteEmail">Email Address *</Label>
-                      <Input
-                        id="inviteEmail"
-                        type="email"
-                        placeholder="colleague@example.com"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        disabled={isInviting}
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="inviteRole">Role *</Label>
-                      <Select value={inviteRole} onValueChange={(value) => setInviteRole(value as "admin" | "member" | "viewer")}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="viewer">Viewer - View only access</SelectItem>
-                          <SelectItem value="member">Member - Standard access</SelectItem>
-                          <SelectItem value="admin">Admin - Full management access</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  
-                  {inviteError && (
-                    <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
-                      <p className="font-medium">Error:</p>
-                      <p>{inviteError}</p>
-                    </div>
-                  )}
-                  
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="submit" disabled={isInviting} className="flex-1 md:flex-none">
-                      {isInviting ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Creating Invitation...
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus className="w-4 h-4 mr-2" />
-                          Create Invitation
-                        </>
-                      )}
-                    </Button>
-                    
-                    <Button 
-                      type="button" 
-                      disabled={isInviting}
-                      onClick={handleQuickSendEmail}
-                      className="flex-1 md:flex-none bg-green-600 hover:bg-green-700"
-                    >
-                      {isInviting ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          <Mail className="w-4 h-4 mr-2" />
-                          Quick Send Email
-                        </>
-                      )}
-                    </Button>
-                    
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      disabled={isInviting}
-                      onClick={handleTestEmail}
-                      className="px-4"
-                    >
-                      Test Email
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      disabled={isInviting}
-                      onClick={handleTestInvitationEmail}
-                      className="px-4"
-                    >
-                      Test Invite
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      disabled={isInviting}
-                      onClick={handleDebugEmail}
-                      className="px-4"
-                    >
-                      Debug Email
-                    </Button>
-                  </div>
-                </form>
-                
-                {createdInvite && (
-                  <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <p className="font-medium text-green-800 mb-2">Invitation Created!</p>
-                    <p className="text-sm text-green-700 mb-3">
-                      Choose how to share this invitation with {createdInvite.email}:
-                    </p>
-                    
-                    <div className="space-y-3">
-                      {/* Token copy option */}
-                      <div className="p-3 bg-white rounded border">
-                        <p className="text-sm font-medium text-gray-700 mb-2">Option 1: Copy Token</p>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            value={createdInvite.token}
-                            readOnly
-                            className="font-mono text-sm"
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => copyToClipboard(createdInvite.token)}
-                          >
-                            <Copy className="w-4 h-4 mr-1" />
-                            Copy
-                          </Button>
-                        </div>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Send this token to the user manually. They can enter it at the signup page.
-                        </p>
-                      </div>
-                      
-                      {/* Email sending option */}
-                      <div className="p-3 bg-white rounded border">
-                        <p className="text-sm font-medium text-gray-700 mb-2">Option 2: Send Email</p>
-                        <Button
-                          onClick={handleSendDirectEmail}
-                          disabled={isEmailSending}
-                          className="w-full"
-                        >
-                          {isEmailSending ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                              Sending Email...
-                            </>
-                          ) : (
-                            <>
-                              <Mail className="w-4 h-4 mr-2" />
-                              Send Email to {createdInvite.email}
-                            </>
-                          )}
-                        </Button>
-                        <p className="text-xs text-gray-600 mt-1">
-                          Send the invitation directly to the user&apos;s email address using our improved email system.
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <p className="text-xs text-green-600 mt-3">
-                      This invitation expires in 7 days
-                    </p>
-                  </div>
-                )}
-                
-                <div className="mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
-                  <p className="text-sm text-blue-800">
-                    <strong>Three ways to invite users:</strong>
-                  </p>
-                  <ul className="text-sm text-blue-700 mt-2 space-y-1">
-                    <li><strong>• Quick Send Email:</strong> Creates invitation and sends email immediately</li>
-                    <li><strong>• Create Invitation:</strong> Generate token first, then choose copy or email</li>
-                    <li><strong>• Manual sharing:</strong> Copy token and share via SMS, phone, or in-person</li>
-                  </ul>
-                  <p className="text-sm text-blue-700 mt-2">
-                    The user can create a new account using the invitation token if they don&apos;t have one.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         {/* Quick Actions */}

@@ -75,7 +75,7 @@ export const createPatient = mutation({
   },
 });
 
-// Get all patients for the current user's organization
+// Get all patients for the current user's organization AND patients they have access to via token grants
 export const getPatients = query({
   args: {
     limit: v.optional(v.number()),
@@ -97,17 +97,69 @@ export const getPatients = query({
       throw new Error("User must be part of an organization to view patients");
     }
 
-    const query = ctx.db
+    // Get patients from user's organization
+    const ownOrgPatients = await ctx.db
       .query("patients")
       .withIndex("by_organization", (q) => q.eq("organizationId", userProfile.organizationId!))
       .filter((q) => q.eq(q.field("isActive"), true))
-      .order("desc");
+      .collect();
+
+    // Get patients user has been granted access to via token access
+    const accessGrants = await ctx.db
+      .query("tokenAccessGrants")
+      .withIndex("by_grantee", (q) => q.eq("grantedTo", userProfile._id))
+      .filter((q) => q.eq(q.field("status"), "approved"))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    // Get shared patients (excluding expired access)
+    const sharedPatients = await Promise.all(
+      accessGrants.map(async (grant) => {
+        // Check if access has expired (but don't auto-revoke in query)
+        if (grant.expiresAt && grant.expiresAt < Date.now()) {
+          return null;
+        }
+
+        const patient = await ctx.db.get(grant.patientId);
+        if (!patient || !patient.isActive) {
+          return null;
+        }
+
+        // Mark as shared patient
+        return {
+          ...patient,
+          isShared: true,
+          accessType: grant.accessType,
+          permissions: grant.permissions,
+        };
+      })
+    );
+
+    // Filter out null values and combine with own org patients
+    const validSharedPatients = sharedPatients.filter(p => p !== null);
+    
+    // Mark own org patients as not shared
+    const ownOrgPatientsWithMeta = ownOrgPatients.map(patient => ({
+      ...patient,
+      isShared: false,
+      accessType: "same_organization" as const,
+      permissions: ["view", "edit", "comment", "view_medications"] as const,
+    }));
+
+    // Combine and deduplicate (in case user has access to patient from their own org)
+    const allPatients = [...ownOrgPatientsWithMeta, ...validSharedPatients];
+    const uniquePatients = allPatients.filter((patient, index, self) => 
+      index === self.findIndex(p => p._id === patient._id)
+    );
+
+    // Sort by creation date, newest first
+    uniquePatients.sort((a, b) => b.createdAt - a.createdAt);
 
     if (args.limit) {
-      return await query.take(args.limit);
+      return uniquePatients.slice(args.offset || 0, (args.offset || 0) + args.limit);
     }
     
-    return await query.collect();
+    return uniquePatients.slice(args.offset || 0);
   },
 });
 
