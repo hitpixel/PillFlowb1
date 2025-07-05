@@ -51,6 +51,7 @@ export function PatientScripts({ patientId }: PatientScriptsProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [description, setDescription] = useState("");
+  const [documentType, setDocumentType] = useState<string>("other");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Etoken state
@@ -126,24 +127,29 @@ export function PatientScripts({ patientId }: PatientScriptsProps) {
       const { storageId } = await result.json();
 
       // Step 3: Save file metadata to database
+      const finalDescription = documentType !== "other" 
+        ? `${getDocumentTypeDisplay(documentType)}${description.trim() ? ` - ${description.trim()}` : ''}`
+        : description.trim() || undefined;
+
       await saveScript({
         patientId: patientId as any,
         storageId: storageId,
         originalFileName: selectedFile.name,
         fileType: selectedFile.type as "application/pdf" | "image/png",
         fileSize: selectedFile.size,
-        description: description.trim() || undefined,
+        description: finalDescription,
       });
 
-      toast.success("Script uploaded successfully");
+      toast.success("Document uploaded successfully");
       setIsUploadDialogOpen(false);
       setSelectedFile(null);
       setDescription("");
+      setDocumentType("other");
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
     } catch (error) {
-      toast.error("Failed to upload script");
+      toast.error("Failed to upload document");
       console.error(error);
     } finally {
       setIsUploading(false);
@@ -157,9 +163,9 @@ export function PatientScripts({ patientId }: PatientScriptsProps) {
 
     try {
       await deleteScript({ scriptId: scriptId as any });
-      toast.success("Script deleted successfully");
+      toast.success("Document deleted successfully");
     } catch (error) {
-      toast.error("Failed to delete script");
+      toast.error("Failed to delete document");
       console.error(error);
     }
   };
@@ -225,6 +231,19 @@ export function PatientScripts({ patientId }: PatientScriptsProps) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const getDocumentTypeDisplay = (type: string) => {
+    switch (type) {
+      case 'medication_script':
+        return 'Medication Script';
+      case 'new_medication_summary':
+        return 'New Medication Summary';
+      case 'discharge_medicines_review':
+        return 'Discharge Medicines Review';
+      default:
+        return '';
+    }
+  };
+
   const getFileIcon = (fileType: string) => {
     if (fileType === 'application/pdf') {
       return <FileText className="h-5 w-5 text-red-600" />;
@@ -262,382 +281,376 @@ export function PatientScripts({ patientId }: PatientScriptsProps) {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Scripts Section */}
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            <h3 className="text-lg font-semibold">Scripts & Documents</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">
-              {scripts?.length || 0} Files
-            </Badge>
-            <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Script
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Upload Script</DialogTitle>
-                  <DialogDescription>
-                    Upload PDF or PNG files for this patient. Maximum file size is 10MB.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="file">File (PDF or PNG only)</Label>
-                    <Input
-                      id="file"
-                      type="file"
-                      accept=".pdf,.png"
-                      onChange={handleFileSelect}
-                      ref={fileInputRef}
-                    />
-                    {selectedFile && (
-                      <div className="flex items-center gap-2 p-2 bg-muted rounded">
-                        {getFileIcon(selectedFile.type)}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {selectedFile.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatFileSize(selectedFile.size)}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedFile(null);
-                            if (fileInputRef.current) {
-                              fileInputRef.current.value = "";
-                            }
-                          }}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          <h3 className="text-lg font-semibold">Scripts & Documents</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline">
+            {scripts?.length || 0} Files
+          </Badge>
+          <Badge variant="outline">
+            {etokens?.length || 0} E-tokens
+          </Badge>
+          <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Scripts & Documents
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Upload Scripts & Documents</DialogTitle>
+                <DialogDescription>
+                  Upload PDF or PNG files for this patient. Maximum file size is 10MB.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="documentType">Document Type</Label>
+                  <Select value={documentType} onValueChange={setDocumentType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select document type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="medication_script">Medication Script</SelectItem>
+                      <SelectItem value="new_medication_summary">New Medication Summary</SelectItem>
+                      <SelectItem value="discharge_medicines_review">Discharge Medicines Review</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="file">File (PDF or PNG only)</Label>
+                  <Input
+                    id="file"
+                    type="file"
+                    accept=".pdf,.png"
+                    onChange={handleFileSelect}
+                    ref={fileInputRef}
+                  />
+                  {selectedFile && (
+                    <div className="flex items-center gap-2 p-2 bg-muted rounded">
+                      {getFileIcon(selectedFile.type)}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {selectedFile.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(selectedFile.size)}
+                        </p>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                          }
+                        }}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">
+                    {documentType === "other" ? "Description" : "Additional Notes (Optional)"}
+                  </Label>
+                  <Textarea
+                    id="description"
+                    placeholder={
+                      documentType === "other" 
+                        ? "Describe what this document is..." 
+                        : "Any additional notes about this document..."
+                    }
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsUploadDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleUpload}
+                    disabled={!selectedFile || isUploading}
+                  >
+                    {isUploading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Upload
+                      </>
                     )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description (Optional)</Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Brief description of the script..."
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsUploadDialogOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleUpload}
-                      disabled={!selectedFile || isUploading}
-                    >
-                      {isUploading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Uploading...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload
-                        </>
-                      )}
-                    </Button>
-                  </div>
+                  </Button>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={isEtokenDialogOpen} onOpenChange={setIsEtokenDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Plus className="h-4 w-4 mr-2" />
+                Add E-token
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Add E-Script Token</DialogTitle>
+                <DialogDescription>
+                  Add an e-script token key or e-script link for this patient.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tokenType">Token Type</Label>
+                  <Select value={etokenType} onValueChange={(value: "token_key" | "e_script_link") => setEtokenType(value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select token type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="token_key">Token Key</SelectItem>
+                      <SelectItem value="e_script_link">E-Script Link</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="tokenValue">
+                    {etokenType === 'token_key' ? 'Token Key' : 'E-Script Link'}
+                  </Label>
+                  <Input
+                    id="tokenValue"
+                    type="text"
+                    placeholder={etokenType === 'token_key' ? 'Enter token key...' : 'Enter e-script link...'}
+                    value={etokenValue}
+                    onChange={(e) => setEtokenValue(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="etokenDescription">Description (Optional)</Label>
+                  <Textarea
+                    id="etokenDescription"
+                    placeholder="Brief description of the e-token..."
+                    value={etokenDescription}
+                    onChange={(e) => setEtokenDescription(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsEtokenDialogOpen(false);
+                      setEtokenValue("");
+                      setEtokenDescription("");
+                      setEtokenType("token_key");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleAddEtoken}
+                    disabled={!etokenValue.trim() || isAddingEtoken}
+                  >
+                    {isAddingEtoken ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add E-token
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
-
-        {/* Scripts List */}
-        {scripts?.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-lg font-medium text-muted-foreground">No scripts uploaded</p>
-              <p className="text-sm text-muted-foreground">Upload PDF or PNG files for this patient</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {scripts?.map((script: any) => (
-              <Card key={script._id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4 flex-1">
-                      <div className="flex-shrink-0">
-                        {getFileIcon(script.fileType)}
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="text-lg font-semibold truncate">
-                            {script.originalFileName}
-                          </h4>
-                          {getFileTypeBadge(script.fileType)}
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground mb-3">
-                          <div className="flex items-center gap-1">
-                            <FileText className="h-3 w-3" />
-                            <span>{formatFileSize(script.fileSize)}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>
-                              {formatDistanceToNow(new Date(script.uploadedAt), { addSuffix: true })}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            <span>
-                              {script.uploadedByUser?.firstName} {script.uploadedByUser?.lastName}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 mb-3">
-                          <Badge variant="outline" className="text-xs">
-                            <Building2 className="h-3 w-3 mr-1" />
-                            {script.uploadedByOrg?.name}
-                          </Badge>
-                        </div>
-
-                        {script.description && (
-                          <div className="bg-muted/50 rounded p-3 mb-3">
-                            <p className="text-sm">{script.description}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 ml-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDownload(script.downloadUrl)}
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDelete(script._id, script.originalFileName)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* E-tokens Section */}
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Key className="h-5 w-5" />
-            <h3 className="text-lg font-semibold">E-Script Tokens</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">
-              {etokens?.length || 0} E-tokens
-            </Badge>
-            <Dialog open={isEtokenDialogOpen} onOpenChange={setIsEtokenDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add E-token
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Add E-Script Token</DialogTitle>
-                  <DialogDescription>
-                    Add an e-script token key or e-script link for this patient.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="tokenType">Token Type</Label>
-                    <Select value={etokenType} onValueChange={(value: "token_key" | "e_script_link") => setEtokenType(value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select token type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="token_key">Token Key</SelectItem>
-                        <SelectItem value="e_script_link">E-Script Link</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="tokenValue">
-                      {etokenType === 'token_key' ? 'Token Key' : 'E-Script Link'}
-                    </Label>
-                    <Input
-                      id="tokenValue"
-                      type="text"
-                      placeholder={etokenType === 'token_key' ? 'Enter token key...' : 'Enter e-script link...'}
-                      value={etokenValue}
-                      onChange={(e) => setEtokenValue(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="etokenDescription">Description (Optional)</Label>
-                    <Textarea
-                      id="etokenDescription"
-                      placeholder="Brief description of the e-token..."
-                      value={etokenDescription}
-                      onChange={(e) => setEtokenDescription(e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsEtokenDialogOpen(false);
-                        setEtokenValue("");
-                        setEtokenDescription("");
-                        setEtokenType("token_key");
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleAddEtoken}
-                      disabled={!etokenValue.trim() || isAddingEtoken}
-                    >
-                      {isAddingEtoken ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Adding...
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add E-token
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-
-        {/* E-tokens List */}
-        {etokens?.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <Key className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-lg font-medium text-muted-foreground">No e-tokens added</p>
-              <p className="text-sm text-muted-foreground">Add e-script token keys or links for this patient</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {etokens?.map((etoken: any) => (
-              <Card key={etoken._id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4 flex-1">
-                      <div className="flex-shrink-0">
-                        {getEtokenIcon(etoken.tokenType)}
+      {/* Documents List */}
+      {scripts?.length === 0 && etokens?.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-lg font-medium text-muted-foreground">No documents or e-tokens</p>
+            <p className="text-sm text-muted-foreground">Upload PDF/PNG files or add e-script tokens for this patient</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {/* Documents */}
+          {scripts?.map((script: any) => (
+            <Card key={script._id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="flex-shrink-0">
+                      {getFileIcon(script.fileType)}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="text-lg font-semibold truncate">
+                          {script.originalFileName}
+                        </h4>
+                        {getFileTypeBadge(script.fileType)}
                       </div>
                       
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="text-lg font-semibold">
-                            {etoken.tokenType === 'token_key' ? 'E-Script Token Key' : 'E-Script Link'}
-                          </h4>
-                          {getEtokenTypeBadge(etoken.tokenType)}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground mb-3">
+                        <div className="flex items-center gap-1">
+                          <FileText className="h-3 w-3" />
+                          <span>{formatFileSize(script.fileSize)}</span>
                         </div>
-                        
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>
+                            {formatDistanceToNow(new Date(script.uploadedAt), { addSuffix: true })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          <span>
+                            {script.uploadedByUser?.firstName} {script.uploadedByUser?.lastName}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mb-3">
+                        <Badge variant="outline" className="text-xs">
+                          <Building2 className="h-3 w-3 mr-1" />
+                          {script.uploadedByOrg?.name}
+                        </Badge>
+                      </div>
+
+                      {script.description && (
                         <div className="bg-muted/50 rounded p-3 mb-3">
-                          <p className="text-sm font-mono break-all">
-                            {etoken.tokenValue}
-                          </p>
+                          <p className="text-sm">{script.description}</p>
                         </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground mb-3">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>
-                              {formatDistanceToNow(new Date(etoken.addedAt), { addSuffix: true })}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            <span>
-                              {etoken.addedByUser?.firstName} {etoken.addedByUser?.lastName}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 mb-3">
-                          <Badge variant="outline" className="text-xs">
-                            <Building2 className="h-3 w-3 mr-1" />
-                            {etoken.addedByOrg?.name}
-                          </Badge>
-                        </div>
-
-                        {etoken.description && (
-                          <div className="bg-muted/50 rounded p-3 mb-3">
-                            <p className="text-sm">{etoken.description}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 ml-4">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => handleDeleteEtoken(
-                          etoken._id, 
-                          etoken.tokenType === 'token_key' ? 'token key' : 'e-script link'
-                        )}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
+                      )}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+
+                  <div className="flex items-center gap-2 ml-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownload(script.downloadUrl)}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDelete(script._id, script.originalFileName)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {/* E-tokens */}
+          {etokens?.map((etoken: any) => (
+            <Card key={etoken._id} className="hover:shadow-md transition-shadow border-l-4 border-l-green-500">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="flex-shrink-0">
+                      {getEtokenIcon(etoken.tokenType)}
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="text-lg font-semibold">
+                          {etoken.tokenType === 'token_key' ? 'E-Script Token Key' : 'E-Script Link'}
+                        </h4>
+                        {getEtokenTypeBadge(etoken.tokenType)}
+                      </div>
+                      
+                      <div className="bg-muted/50 rounded p-3 mb-3">
+                        <p className="text-sm font-mono break-all">
+                          {etoken.tokenValue}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground mb-3">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>
+                            {formatDistanceToNow(new Date(etoken.addedAt), { addSuffix: true })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          <span>
+                            {etoken.addedByUser?.firstName} {etoken.addedByUser?.lastName}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mb-3">
+                        <Badge variant="outline" className="text-xs">
+                          <Building2 className="h-3 w-3 mr-1" />
+                          {etoken.addedByOrg?.name}
+                        </Badge>
+                      </div>
+
+                      {etoken.description && (
+                        <div className="bg-muted/50 rounded p-3 mb-3">
+                          <p className="text-sm">{etoken.description}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 ml-4">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteEtoken(
+                        etoken._id, 
+                        etoken.tokenType === 'token_key' ? 'token key' : 'e-script link'
+                      )}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 } 
