@@ -59,6 +59,7 @@ export default function OrganizationSettingsPage() {
   const userProfile = useQuery(api.users.getCurrentUserProfile);
   const organizationWithSubscription = useQuery(api.polar.getOrganizationWithSubscription);
   const products = useQuery(api.polar.getConfiguredProducts);
+  const allProducts = useQuery(api.polar.listAllProducts);
   
   // Mutations
   const updateOrganization = useMutation(api.users.updateOrganization);
@@ -67,6 +68,7 @@ export default function OrganizationSettingsPage() {
   const generateCheckoutLink = useAction(api.polar.generateCheckoutLink);
   const generateCustomerPortalUrl = useAction(api.polar.generateCustomerPortalUrl);
   const cancelSubscription = useAction(api.polar.cancelCurrentSubscription);
+  const syncProducts = useAction(api.polar.syncProducts);
   
   // State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -176,8 +178,23 @@ export default function OrganizationSettingsPage() {
   const handleStartSubscription = async () => {
     try {
       setIsSubmitting(true);
+      
+      // Get product ID - try configured products first, then all products
+      let productId: string | null = null;
+      
+      if (products?.premium?.id) {
+        productId = products.premium.id;
+      } else if (allProducts && allProducts.length > 0) {
+        // Use the first available product if configured products don't work
+        productId = allProducts[0].id;
+      }
+      
+      if (!productId) {
+        throw new Error("No products available. Please contact support.");
+      }
+      
       const checkoutUrl = await generateCheckoutLink({ 
-        productIds: products?.premium ? [products.premium.id] : [],
+        productIds: [productId],
         origin: window.location.origin,
         successUrl: window.location.origin + '/organization/settings'
       });
@@ -213,6 +230,19 @@ export default function OrganizationSettingsPage() {
       setTimeout(() => setSuccess(null), 3000);
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Failed to cancel subscription");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSyncProducts = async () => {
+    try {
+      setIsSubmitting(true);
+      await syncProducts();
+      setSuccess("Products synced successfully!");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Failed to sync products");
     } finally {
       setIsSubmitting(false);
     }
@@ -332,20 +362,45 @@ export default function OrganizationSettingsPage() {
                       </p>
                     </div>
                     
-                    <Button 
-                      onClick={handleStartSubscription}
-                      disabled={isSubmitting || !products?.premium}
-                      className="w-full"
-                    >
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Start Subscription
-                    </Button>
+                    <div className="space-y-2">
+                      <Button 
+                        onClick={handleStartSubscription}
+                        disabled={isSubmitting || (!products?.premium && (!allProducts || allProducts.length === 0))}
+                        className="w-full"
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Start Subscription
+                      </Button>
+                      
+                      {!products?.premium && (
+                        <Button 
+                          onClick={handleSyncProducts}
+                          disabled={isSubmitting}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          Sync Products from Polar
+                        </Button>
+                      )}
+                    </div>
                     
-                    {products?.premium && (
-                      <div className="text-sm text-muted-foreground">
-                        Premium plan - ${(products.premium.prices[0]?.priceAmount || 0) / 100}/month
+                    {/* Debug info for products */}
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      {products?.premium ? (
+                        <div>Premium plan - ${(products.premium.prices[0]?.priceAmount || 0) / 100}/month</div>
+                      ) : allProducts && allProducts.length > 0 ? (
+                        <div>Available plan - ${(allProducts[0].prices[0]?.priceAmount || 0) / 100}/month</div>
+                      ) : (
+                        <div>Loading products...</div>
+                      )}
+                      
+                      {/* Temporary debug info */}
+                      <div className="bg-gray-100 p-2 rounded text-xs">
+                        <div>Configured products: {products ? 'loaded' : 'loading'}</div>
+                        <div>All products: {allProducts ? allProducts.length : 'loading'}</div>
+                        <div>Premium product: {products?.premium ? 'available' : 'not found'}</div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>
