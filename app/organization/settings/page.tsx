@@ -8,7 +8,8 @@ import {
   ChevronLeft,
   Save,
   CreditCard,
-  ExternalLink
+  ExternalLink,
+  CheckCircle2
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -339,29 +340,29 @@ export default function OrganizationSettingsPage() {
           </div>
         )}
 
-        {/* Subscription Management - Only for Organization Owners */}
+                {/* Subscription Management - Only for Organization Owners */}
         {userProfile?.role === "owner" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5" />
-                Subscription Management
-              </CardTitle>
-              <CardDescription>
-                Manage your organization&apos;s subscription plan
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {organizationWithSubscription?.subscription ? (
+          <>
+            {organizationWithSubscription?.subscription ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5" />
+                    Subscription Management
+                  </CardTitle>
+                  <CardDescription>
+                    Manage your organization&apos;s subscription plan
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                                             <div>
-                         <h3 className="font-semibold">Current Plan</h3>
-                         <p className="text-sm text-muted-foreground">
-                           {organizationWithSubscription.subscription.productKey || 'Standard'}
-                         </p>
-                       </div>
+                      <div>
+                        <h3 className="font-semibold">Current Plan</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {organizationWithSubscription.subscription.productKey || 'Standard'}
+                        </p>
+                      </div>
                       <Badge variant="secondary">
                         Active
                       </Badge>
@@ -385,78 +386,153 @@ export default function OrganizationSettingsPage() {
                       </Button>
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                                         <div>
-                       <h3 className="font-semibold">No Active Subscription</h3>
-                       <p className="text-sm text-muted-foreground">
-                         Subscribe to the Standard plan to access premium features for your organization
-                       </p>
-                     </div>
-                    
-                    <div className="space-y-2">
-                      <Button 
-                        onClick={handleStartSubscription}
-                        disabled={isSubmitting || (!products?.standard && (!allProducts || allProducts.length === 0))}
-                        className="w-full"
-                      >
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        Start Subscription
-                      </Button>
-                      
-                      <div className="grid grid-cols-2 gap-2">
-                        {!products?.standard && (
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Left Column - Benefits */}
+                <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+                  <CardHeader>
+                    <CardTitle className="text-xl text-blue-900">
+                      Why Subscribe to PillFlow?
+                    </CardTitle>
+                    <CardDescription className="text-blue-700">
+                      Unlock the full potential of your healthcare organization
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                      <div>
+                        <h4 className="font-medium text-blue-900">Unlimited Member Access</h4>
+                        <p className="text-sm text-blue-700">Add unlimited team members to your organization without restrictions</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                      <div>
+                        <h4 className="font-medium text-blue-900">Continuous Updates</h4>
+                        <p className="text-sm text-blue-700">Get access to all new features and improvements as soon as they&apos;re released</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                      <div>
+                        <h4 className="font-medium text-blue-900">24/7 Support</h4>
+                        <p className="text-sm text-blue-700">Priority customer support whenever you need assistance</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                      <div>
+                        <h4 className="font-medium text-blue-900">Manage All Patients in One Place</h4>
+                        <p className="text-sm text-blue-700">Centralized patient management with advanced tracking and reporting</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></div>
+                      <div>
+                        <h4 className="font-medium text-blue-900">Advanced Analytics</h4>
+                        <p className="text-sm text-blue-700">Comprehensive insights and reports to optimize your operations</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Right Column - Subscription Card */}
+                <Card className="border-2 border-primary/20 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 bg-green-500 text-white px-3 py-1 text-sm font-medium">
+                    1 Month Free Trial
+                  </div>
+                  <CardHeader className="pt-8">
+                    <CardTitle className="text-2xl text-center">Standard Plan</CardTitle>
+                    <div className="text-center">
+                      <div className="text-4xl font-bold text-primary">
+                        ${products?.standard ? (products.standard.prices[0]?.priceAmount || 30000) / 100 : 300}
+                      </div>
+                      <div className="text-sm text-muted-foreground">per month</div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="font-medium text-green-800">Free Trial Offer</span>
+                      </div>
+                      <p className="text-sm text-green-700 mb-2">
+                        Start with a 1-month free trial. Use promo code:
+                      </p>
+                      <div className="bg-white border border-green-300 rounded px-3 py-2 font-mono text-center text-green-800 font-bold">
+                        B00C4M3H
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        <span>Unlimited team members</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        <span>Priority support</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        <span>Advanced features</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        <span>Regular updates</span>
+                      </div>
+                    </div>
+
+                    <Button 
+                      onClick={handleStartSubscription}
+                      disabled={isSubmitting || (!products?.standard && (!allProducts || allProducts.length === 0))}
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-3"
+                      size="lg"
+                    >
+                      <CreditCard className="w-5 h-5 mr-2" />
+                      {isSubmitting ? "Starting..." : "Start Free Trial"}
+                    </Button>
+
+                    <p className="text-xs text-center text-muted-foreground">
+                      No credit card required for trial. Cancel anytime.
+                    </p>
+
+                    {/* Debug/Sync Tools - Only show if there are issues */}
+                    {(!products?.standard && (!allProducts || allProducts.length === 0)) && (
+                      <div className="border-t pt-4 space-y-2">
+                        <p className="text-xs text-muted-foreground text-center">
+                          Having trouble? Try these options:
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {!products?.standard && (
+                            <Button 
+                              onClick={handleSyncProducts}
+                              disabled={isSubmitting}
+                              variant="outline"
+                              size="sm"
+                            >
+                              Sync Products
+                            </Button>
+                          )}
                           <Button 
-                            onClick={handleSyncProducts}
+                            onClick={handleTestConnection}
                             disabled={isSubmitting}
                             variant="outline"
                             size="sm"
                           >
-                            Sync Products
+                            Test Connection
                           </Button>
-                        )}
-                        <Button 
-                          onClick={handleTestConnection}
-                          disabled={isSubmitting}
-                          variant="outline"
-                          size="sm"
-                        >
-                          Test Connection
-                        </Button>
+                        </div>
                       </div>
-                    </div>
-                    
-                                         {/* Pricing info */}
-                     {products?.standard ? (
-                       <div className="text-sm text-muted-foreground">
-                         Standard - ${(products.standard.prices[0]?.priceAmount || 0) / 100}/month
-                       </div>
-                     ) : allProducts && allProducts.length > 0 ? (
-                       <div className="text-sm text-muted-foreground">
-                         {allProducts[0].name} - ${(allProducts[0].prices[0]?.priceAmount || 0) / 100}/month
-                       </div>
-                     ) : (
-                       <div className="text-sm text-muted-foreground">
-                         Loading product information...
-                       </div>
-                     )}
-                     
-                     {/* Temporary debug info to help diagnose the issue */}
-                     <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                       <div><strong>Debug Info:</strong></div>
-                       <div>Products loaded: {products ? 'Yes' : 'No'}</div>
-                       <div>Standard product: {products?.standard ? 'Found' : 'Not found'}</div>
-                       <div>All products count: {allProducts ? allProducts.length : 'Loading'}</div>
-                       {allProducts && allProducts.length > 0 && (
-                         <div>First product: {allProducts[0].name} (ID: {allProducts[0].id})</div>
-                       )}
-                       <div>Expected ID: 5e14210e-3208-4167-8cd6-d83825c60484</div>
-                     </div>
-                  </div>
-                )}
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
+            )}
+          </>
         )}
 
         {/* Settings Form */}
