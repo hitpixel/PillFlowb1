@@ -1,12 +1,14 @@
 "use client";
 
-import { useConvexAuth, useQuery, useMutation } from "convex/react";
+import { useConvexAuth, useQuery, useMutation, useAction } from "convex/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { 
   ChevronLeft,
-  Save
+  Save,
+  CreditCard,
+  ExternalLink
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
@@ -54,9 +57,16 @@ export default function OrganizationSettingsPage() {
   // Queries
   const organization = useQuery(api.users.getOrganization) as Organization | null;
   const userProfile = useQuery(api.users.getCurrentUserProfile);
+  const organizationWithSubscription = useQuery(api.polar.getOrganizationWithSubscription);
+  const products = useQuery(api.polar.getConfiguredProducts);
   
   // Mutations
   const updateOrganization = useMutation(api.users.updateOrganization);
+  
+  // Actions
+  const generateCheckoutLink = useAction(api.polar.generateCheckoutLink);
+  const generateCustomerPortalUrl = useAction(api.polar.generateCustomerPortalUrl);
+  const cancelSubscription = useAction(api.polar.cancelCurrentSubscription);
   
   // State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -163,6 +173,51 @@ export default function OrganizationSettingsPage() {
     }
   };
 
+  const handleStartSubscription = async () => {
+    try {
+      setIsSubmitting(true);
+      const checkoutUrl = await generateCheckoutLink({ 
+        productIds: products?.premium ? [products.premium.id] : [],
+        origin: window.location.origin,
+        successUrl: window.location.origin + '/organization/settings'
+      });
+      window.open(checkoutUrl.url, '_blank');
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Failed to generate checkout link");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    try {
+      setIsSubmitting(true);
+      const portalUrl = await generateCustomerPortalUrl();
+      window.open(portalUrl.url, '_blank');
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Failed to open customer portal");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (!confirm("Are you sure you want to cancel your subscription? This action cannot be undone.")) {
+      return;
+    }
+    
+    try {
+      setIsSubmitting(true);
+      await cancelSubscription({ revokeImmediately: false });
+      setSuccess("Subscription canceled successfully!");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (error: unknown) {
+      setError(error instanceof Error ? error.message : "Failed to cancel subscription");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -220,6 +275,82 @@ export default function OrganizationSettingsPage() {
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
             {error}
           </div>
+        )}
+
+        {/* Subscription Management - Only for Organization Owners */}
+        {userProfile?.role === "owner" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                Subscription Management
+              </CardTitle>
+              <CardDescription>
+                Manage your organization&apos;s subscription plan
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {organizationWithSubscription?.subscription ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold">Current Plan</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {organizationWithSubscription.subscription.productKey || 'Premium Plan'}
+                        </p>
+                      </div>
+                      <Badge variant="secondary">
+                        Active
+                      </Badge>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <Button 
+                        onClick={handleManageSubscription}
+                        disabled={isSubmitting}
+                        variant="outline"
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Manage Subscription
+                      </Button>
+                      <Button 
+                        onClick={handleCancelSubscription}
+                        disabled={isSubmitting}
+                        variant="destructive"
+                      >
+                        Cancel Subscription
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-semibold">No Active Subscription</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Subscribe to access premium features for your organization
+                      </p>
+                    </div>
+                    
+                    <Button 
+                      onClick={handleStartSubscription}
+                      disabled={isSubmitting || !products?.premium}
+                      className="w-full"
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Start Subscription
+                    </Button>
+                    
+                    {products?.premium && (
+                      <div className="text-sm text-muted-foreground">
+                        Premium plan - ${(products.premium.prices[0]?.priceAmount || 0) / 100}/month
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Settings Form */}

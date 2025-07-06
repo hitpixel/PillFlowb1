@@ -2,6 +2,7 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { auth } from "./auth";
 import { resend } from "./emails";
+import { polar } from "./polar";
 
 const http = httpRouter();
 
@@ -15,5 +16,8 @@ http.route({
     return await resend.handleResendEventWebhook(ctx, req);
   }),
 });
+
+// Register Polar webhook handler
+polar.registerRoutes(http as any);
 
 export default http;

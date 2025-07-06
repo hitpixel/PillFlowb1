@@ -17,7 +17,9 @@ import {
   Eye,
   Settings,
   UserPlus,
-  ExternalLink
+  ExternalLink,
+  CreditCard,
+  CheckCircle2
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -97,6 +99,7 @@ export default function OrganizationOverviewPage() {
   const members = useQuery(api.users.getOrganizationMembers) as Member[];
   const invitations = useQuery(api.users.getPendingInvitations);
   const userProfile = useQuery(api.users.getCurrentUserProfile);
+  const organizationWithSubscription = useQuery(api.polar.getOrganizationWithSubscription);
   
 
 
@@ -211,7 +214,7 @@ export default function OrganizationOverviewPage() {
 
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Team Members</CardTitle>
@@ -271,6 +274,44 @@ export default function OrganizationOverviewPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Subscription Status - Only for Organization Owners */}
+          {userProfile?.role === "owner" && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Subscription</CardTitle>
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  {organizationWithSubscription?.subscription ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      <span className="text-sm font-medium text-green-600">Active</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="h-4 w-4 text-orange-500" />
+                      <span className="text-sm font-medium text-orange-600">Free</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-muted-foreground">
+                    {organizationWithSubscription?.subscription 
+                      ? organizationWithSubscription.subscription.productKey || 'Premium'
+                      : 'No subscription'
+                    }
+                  </p>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link href="/organization/settings">
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Organization Details */}
