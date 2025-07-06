@@ -182,8 +182,8 @@ export default function OrganizationSettingsPage() {
       // Get product ID - try configured products first, then all products
       let productId: string | null = null;
       
-      if (products?.premium?.id) {
-        productId = products.premium.id;
+      if (products?.standard?.id) {
+        productId = products.standard.id;
       } else if (allProducts && allProducts.length > 0) {
         // Use the first available product if configured products don't work
         productId = allProducts[0].id;
@@ -324,12 +324,12 @@ export default function OrganizationSettingsPage() {
                 {organizationWithSubscription?.subscription ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold">Current Plan</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {organizationWithSubscription.subscription.productKey || 'Premium Plan'}
-                        </p>
-                      </div>
+                                             <div>
+                         <h3 className="font-semibold">Current Plan</h3>
+                         <p className="text-sm text-muted-foreground">
+                           {organizationWithSubscription.subscription.productKey || 'Standard Plan'}
+                         </p>
+                       </div>
                       <Badge variant="secondary">
                         Active
                       </Badge>
@@ -355,24 +355,24 @@ export default function OrganizationSettingsPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <div>
-                      <h3 className="font-semibold">No Active Subscription</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Subscribe to access premium features for your organization
-                      </p>
-                    </div>
+                                         <div>
+                       <h3 className="font-semibold">No Active Subscription</h3>
+                       <p className="text-sm text-muted-foreground">
+                         Subscribe to the Standard Plan to access premium features for your organization
+                       </p>
+                     </div>
                     
                     <div className="space-y-2">
                       <Button 
                         onClick={handleStartSubscription}
-                        disabled={isSubmitting || (!products?.premium && (!allProducts || allProducts.length === 0))}
+                        disabled={isSubmitting || (!products?.standard && (!allProducts || allProducts.length === 0))}
                         className="w-full"
                       >
                         <CreditCard className="w-4 h-4 mr-2" />
                         Start Subscription
                       </Button>
                       
-                      {!products?.premium && (
+                      {!products?.standard && (
                         <Button 
                           onClick={handleSyncProducts}
                           disabled={isSubmitting}
@@ -384,23 +384,12 @@ export default function OrganizationSettingsPage() {
                       )}
                     </div>
                     
-                    {/* Debug info for products */}
-                    <div className="text-xs text-muted-foreground space-y-1">
-                      {products?.premium ? (
-                        <div>Premium plan - ${(products.premium.prices[0]?.priceAmount || 0) / 100}/month</div>
-                      ) : allProducts && allProducts.length > 0 ? (
-                        <div>Available plan - ${(allProducts[0].prices[0]?.priceAmount || 0) / 100}/month</div>
-                      ) : (
-                        <div>Loading products...</div>
-                      )}
-                      
-                      {/* Temporary debug info */}
-                      <div className="bg-gray-100 p-2 rounded text-xs">
-                        <div>Configured products: {products ? 'loaded' : 'loading'}</div>
-                        <div>All products: {allProducts ? allProducts.length : 'loading'}</div>
-                        <div>Premium product: {products?.premium ? 'available' : 'not found'}</div>
+                    {/* Pricing info */}
+                    {products?.standard && (
+                      <div className="text-sm text-muted-foreground">
+                        Standard Plan - ${(products.standard.prices[0]?.priceAmount || 0) / 100}/month
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
               </div>

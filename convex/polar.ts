@@ -27,9 +27,8 @@ export const polar = new Polar(components.polar, {
   // Optional: Configure static keys for referencing your products.
   // Map your product keys to Polar product IDs
   products: {
-    // Add your product IDs here when you create products in Polar
-    // For now, we'll use the provided product ID
-    premium: "5e14210e-3208-4167-8cd6-d83825c60484",
+    // Standard Plan product from Polar
+    standard: "5e14210e-3208-4167-8cd6-d83825c60484",
   },
 });
 
