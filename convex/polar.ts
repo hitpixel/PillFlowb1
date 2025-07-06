@@ -24,12 +24,14 @@ export const polar = new Polar(components.polar, {
       email: userProfile.email,
     };
   },
-  // Optional: Configure static keys for referencing your products.
+  // Optional: Configure static keys for referencing your v4s.
   // Map your product keys to Polar product IDs
   products: {
-    // Standard Plan product from Polar
+    // Standard Plan product from Polar Production
     standard: "5e14210e-3208-4167-8cd6-d83825c60484",
   },
+  // Explicitly set to production server
+  server: "production",
 });
 
 // Export API functions from the Polar client
@@ -41,6 +43,48 @@ export const {
   generateCheckoutLink,
   generateCustomerPortalUrl,
 } = polar.api();
+
+// Test Polar connection and list products (for debugging)
+export const testPolarConnection = action({
+  handler: async (ctx): Promise<{
+    success: boolean;
+    productCount?: number;
+    products?: Array<{ id: string; name: string; priceAmount?: number }>;
+    server: string;
+    message: string;
+    error?: string;
+  }> => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      throw new Error("User must be authenticated");
+    }
+
+    const userProfile = await ctx.runQuery(api.users.getCurrentUserProfile);
+    if (!userProfile || userProfile.role !== "owner") {
+      throw new Error("Only organization owners can test Polar connection");
+    }
+
+    try {
+      // Try to list all products to test the connection
+      const allProducts = await ctx.runQuery(api.polar.listAllProducts);
+      return {
+        success: true,
+        productCount: allProducts?.length || 0,
+        products: allProducts?.map((p: any) => ({ id: p.id, name: p.name, priceAmount: p.prices[0]?.priceAmount })) || [],
+        server: "production",
+        message: "Polar connection successful"
+      };
+    } catch (error) {
+      console.error("Polar connection test failed:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+        server: "production",
+        message: "Polar connection failed"
+      };
+    }
+  },
+});
 
 // Sync products from Polar (for existing products created before using this component)
 export const syncProducts = action({

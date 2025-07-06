@@ -69,6 +69,7 @@ export default function OrganizationSettingsPage() {
   const generateCustomerPortalUrl = useAction(api.polar.generateCustomerPortalUrl);
   const cancelSubscription = useAction(api.polar.cancelCurrentSubscription);
   const syncProducts = useAction(api.polar.syncProducts);
+  const testPolarConnection = useAction(api.polar.testPolarConnection);
   
   // State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -238,11 +239,42 @@ export default function OrganizationSettingsPage() {
   const handleSyncProducts = async () => {
     try {
       setIsSubmitting(true);
-      await syncProducts();
+      setError(null);
+      console.log("Starting product sync...");
+      const result = await syncProducts();
+      console.log("Sync result:", result);
       setSuccess("Products synced successfully!");
       setTimeout(() => setSuccess(null), 3000);
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Failed to sync products");
+      console.error("Sync error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to sync products";
+      setError(`Sync failed: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    try {
+      setIsSubmitting(true);
+      setError(null);
+      console.log("Testing Polar connection...");
+      const result = await testPolarConnection();
+      console.log("Test result:", result);
+      
+      if (result.success) {
+        setSuccess(`Connection successful! Found ${result.productCount} products.`);
+      } else {
+        setError(`Connection failed: ${result.error}`);
+      }
+      setTimeout(() => {
+        setSuccess(null);
+        setError(null);
+      }, 5000);
+    } catch (error: unknown) {
+      console.error("Test error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to test connection";
+      setError(`Test failed: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -327,7 +359,7 @@ export default function OrganizationSettingsPage() {
                                              <div>
                          <h3 className="font-semibold">Current Plan</h3>
                          <p className="text-sm text-muted-foreground">
-                           {organizationWithSubscription.subscription.productKey || 'Standard Plan'}
+                           {organizationWithSubscription.subscription.productKey || 'Standard'}
                          </p>
                        </div>
                       <Badge variant="secondary">
@@ -358,7 +390,7 @@ export default function OrganizationSettingsPage() {
                                          <div>
                        <h3 className="font-semibold">No Active Subscription</h3>
                        <p className="text-sm text-muted-foreground">
-                         Subscribe to the Standard Plan to access premium features for your organization
+                         Subscribe to the Standard plan to access premium features for your organization
                        </p>
                      </div>
                     
@@ -372,24 +404,54 @@ export default function OrganizationSettingsPage() {
                         Start Subscription
                       </Button>
                       
-                      {!products?.standard && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {!products?.standard && (
+                          <Button 
+                            onClick={handleSyncProducts}
+                            disabled={isSubmitting}
+                            variant="outline"
+                            size="sm"
+                          >
+                            Sync Products
+                          </Button>
+                        )}
                         <Button 
-                          onClick={handleSyncProducts}
+                          onClick={handleTestConnection}
                           disabled={isSubmitting}
                           variant="outline"
-                          className="w-full"
+                          size="sm"
                         >
-                          Sync Products from Polar
+                          Test Connection
                         </Button>
-                      )}
+                      </div>
                     </div>
                     
-                    {/* Pricing info */}
-                    {products?.standard && (
-                      <div className="text-sm text-muted-foreground">
-                        Standard Plan - ${(products.standard.prices[0]?.priceAmount || 0) / 100}/month
-                      </div>
-                    )}
+                                         {/* Pricing info */}
+                     {products?.standard ? (
+                       <div className="text-sm text-muted-foreground">
+                         Standard - ${(products.standard.prices[0]?.priceAmount || 0) / 100}/month
+                       </div>
+                     ) : allProducts && allProducts.length > 0 ? (
+                       <div className="text-sm text-muted-foreground">
+                         {allProducts[0].name} - ${(allProducts[0].prices[0]?.priceAmount || 0) / 100}/month
+                       </div>
+                     ) : (
+                       <div className="text-sm text-muted-foreground">
+                         Loading product information...
+                       </div>
+                     )}
+                     
+                     {/* Temporary debug info to help diagnose the issue */}
+                     <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+                       <div><strong>Debug Info:</strong></div>
+                       <div>Products loaded: {products ? 'Yes' : 'No'}</div>
+                       <div>Standard product: {products?.standard ? 'Found' : 'Not found'}</div>
+                       <div>All products count: {allProducts ? allProducts.length : 'Loading'}</div>
+                       {allProducts && allProducts.length > 0 && (
+                         <div>First product: {allProducts[0].name} (ID: {allProducts[0].id})</div>
+                       )}
+                       <div>Expected ID: 5e14210e-3208-4167-8cd6-d83825c60484</div>
+                     </div>
                   </div>
                 )}
               </div>

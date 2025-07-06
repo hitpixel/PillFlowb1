@@ -299,7 +299,7 @@ export default function OrganizationOverviewPage() {
                 <div className="flex items-center justify-between mt-2">
                                      <p className="text-xs text-muted-foreground">
                      {organizationWithSubscription?.subscription 
-                       ? organizationWithSubscription.subscription.productKey || 'Standard Plan'
+                       ? organizationWithSubscription.subscription.productKey || 'Standard'
                        : 'No subscription'
                      }
                   </p>
