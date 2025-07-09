@@ -56,7 +56,7 @@ export default function SignInPage() {
           </div>
           
           <p className="text-sm text-blue-200 italic">
-            "Transforming healthcare workflows with intelligent solutions"
+            &quot;Transforming healthcare workflows with intelligent solutions&quot;
           </p>
         </div>
         
