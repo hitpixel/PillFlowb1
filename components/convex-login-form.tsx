@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ConvexLoginFormProps {
   className?: string;
@@ -28,6 +29,7 @@ export function ConvexLoginForm({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [acceptTerms, setAcceptTerms] = useState(false);
 
   useEffect(() => {
     const token = searchParams.get('invite');
@@ -94,6 +96,13 @@ export function ConvexLoginForm({
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    
+    // Check terms and conditions for sign-up
+    if (flow === "signUp" && !acceptTerms) {
+      setError("You must accept the terms and conditions to create an account.");
+      setIsLoading(false);
+      return;
+    }
     
     const formData = new FormData(e.target as HTMLFormElement);
     formData.set("flow", flow);
@@ -238,6 +247,38 @@ export function ConvexLoginForm({
               )}
             </div>
             
+            {flow === "signUp" && (
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="terms"
+                  checked={acceptTerms}
+                  onCheckedChange={(checked) => setAcceptTerms(checked === true)}
+                  disabled={isLoading}
+                />
+                <Label 
+                  htmlFor="terms" 
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  I accept the{" "}
+                  <a 
+                    href="#" 
+                    className="text-primary underline underline-offset-4 hover:opacity-80"
+                    onClick={(e) => e.preventDefault()}
+                  >
+                    Terms and Conditions
+                  </a>
+                  {" "}and{" "}
+                  <a 
+                    href="#" 
+                    className="text-primary underline underline-offset-4 hover:opacity-80"
+                    onClick={(e) => e.preventDefault()}
+                  >
+                    Privacy Policy
+                  </a>
+                </Label>
+              </div>
+            )}
+            
             {error && (
               <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
                 <p className="font-medium">Error:</p>
@@ -263,6 +304,7 @@ export function ConvexLoginForm({
                   onClick={() => {
                     setFlow("signUp");
                     setError(null);
+                    setAcceptTerms(false);
                   }}
                   className="underline underline-offset-4 hover:text-primary"
                 >
@@ -277,6 +319,7 @@ export function ConvexLoginForm({
                   onClick={() => {
                     setFlow("signIn");
                     setError(null);
+                    setAcceptTerms(false);
                   }}
                   className="underline underline-offset-4 hover:text-primary"
                 >
