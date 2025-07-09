@@ -20,7 +20,7 @@ export default function RootLayout({
   return (
     <ConvexAuthNextjsServerProvider>
       <html lang="en">
-        <body className="font-helvetica antialiased">
+        <body className="font-manrope antialiased">
           <ConvexClientProvider>
             {children}
             <Toaster />

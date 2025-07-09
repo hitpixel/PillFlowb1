@@ -25,8 +25,20 @@ export default function SignInPage() {
         </div>
       </div>
       
-      {/* Right side - Branding and Image */}
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 relative hidden lg:flex flex-col justify-center items-center p-10 text-white">
+      {/* Right side - Background Image with Text Overlay */}
+      <div className="relative hidden lg:flex flex-col justify-center items-center p-10 text-white">
+        {/* Background Image */}
+        <Image
+          src="/PF-login.jpeg"
+          alt="PillFlow Healthcare Platform"
+          fill
+          className="object-cover"
+        />
+        
+        {/* Dark overlay for better text readability */}
+        <div className="absolute inset-0 bg-black/50"></div>
+        
+        {/* Content on top of image */}
         <div className="relative z-10 text-center">
           <div className="mb-8">
             <div className="flex items-center justify-center gap-3 mb-6">
@@ -40,28 +52,15 @@ export default function SignInPage() {
               Healthcare Medication Management
             </h2>
             
-            <p className="text-lg text-blue-100 mb-8 leading-relaxed max-w-md">
+            <p className="text-lg text-white/90 mb-8 leading-relaxed max-w-md">
               Streamlining medication management for healthcare professionals across Australia.
             </p>
           </div>
           
-          {/* PF-login Image */}
-          <div className="relative w-80 h-64 mx-auto mb-6 rounded-lg overflow-hidden shadow-2xl">
-            <Image
-              src="/PF-login.jpeg"
-              alt="PillFlow Healthcare Platform"
-              fill
-              className="object-cover"
-            />
-          </div>
-          
-          <p className="text-sm text-blue-200 italic">
+          <p className="text-sm text-white/80 italic">
             &quot;Transforming healthcare workflows with intelligent solutions&quot;
           </p>
         </div>
-        
-        {/* Overlay gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/90 to-indigo-700/90"></div>
       </div>
     </div>
   );
