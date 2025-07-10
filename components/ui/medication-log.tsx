@@ -226,7 +226,7 @@ export function MedicationLog({ patientId }: MedicationLogProps) {
                           <span>
                             {log.performedByOrg ? 
                               `${log.performedByOrg.name} (${log.performedByOrg.type})` : 
-                              'Unknown Organization'
+                              'Unknown Organisation'
                             }
                           </span>
                         </div>

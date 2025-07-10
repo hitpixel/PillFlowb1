@@ -51,9 +51,17 @@ export default defineSchema({
       v.literal("hospital"),
       v.literal("aged_care")
     ),
+    // Legacy contact field (keeping for backward compatibility)
     contactPersonName: v.string(),
     phoneNumber: v.string(),
     email: v.string(),
+    // New contact person fields
+    contactPhoneNumber: v.optional(v.string()),
+    contactEmail: v.optional(v.string()),
+    // Billing contact fields
+    billingPersonName: v.optional(v.string()),
+    billingPhoneNumber: v.optional(v.string()),
+    billingEmail: v.optional(v.string()),
     website: v.optional(v.string()),
     streetAddress: v.string(),
     suburb: v.string(),

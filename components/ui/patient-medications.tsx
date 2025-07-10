@@ -91,7 +91,7 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
     setIsSubmitting(true);
     
     // Check if current user has shared access by looking at existing medications
-    // If there are medications from a different organization, this is shared access
+    // If there are medications from a different organisation, this is shared access
     const isSharedAccess = currentUser && medications && medications.length > 0 && 
                            medications.some(med => med.organizationId !== currentUser.organizationId);
     
@@ -125,7 +125,7 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
       
       toast.success("Medication addition request submitted successfully");
     } else {
-      // Add medication directly for users from the same organization
+      // Add medication directly for users from the same organisation
       await addMedication({
         patientId: patientId as any,
         medicationName: data.medicationName,
@@ -296,12 +296,12 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   // Check if current user has shared access to a medication
   const isSharedAccess = (medication: any) => {
     if (!currentUser || !medication.organizationId) return false;
-    // User has shared access if their organization is different from medication's organization
+    // User has shared access if their organisation is different from medication's organisation
     return currentUser.organizationId !== medication.organizationId;
   };
 
-  // Check if current user is from the patient's organization (can approve/reject requests)
-  const isPatientOrganizationUser = () => {
+  // Check if current user is from the patient's organisation (can approve/reject requests)
+  const isPatientOrganisationUser = () => {
     if (!currentUser || !patient?.patient?.organizationId) return false;
     return currentUser.organizationId === patient.patient.organizationId;
   };
@@ -381,7 +381,7 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                     const isSharedAccess = currentUser && medications && medications.length > 0 && 
                                            medications.some(med => med.organizationId !== currentUser.organizationId);
                     return isSharedAccess 
-                      ? "Request to add a new medication - this will require approval from the patient's organization"
+                      ? "Request to add a new medication - this will require approval from the patient's organisation"
                       : "Add a new medication using FDA database search or manual entry";
                   })()}
                 </DialogDescription>
@@ -522,7 +522,7 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
                       </>
                     )}
                     {((medication.hasPendingRequest && medication.pendingRequest) || medication.isPendingAddition) && 
-                     isPatientOrganizationUser() && (
+                     isPatientOrganisationUser() && (
                       <div className="flex items-center gap-2">
                         <Button 
                           variant="default" 

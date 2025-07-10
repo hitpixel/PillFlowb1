@@ -5,15 +5,16 @@ import { useRouter } from "next/navigation";
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
+import Image from "next/image";
 import { Building2, GalleryVerticalEnd, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ProgressSteps } from "@/components/ui/progress-steps";
 
-type SetupStep = "profile" | "choice" | "create" | "join";
+type SetupStep = "profile" | "choice" | "create" | "contact" | "join";
 
 function ProgressIndicator({ steps, currentStep, completedSteps }: { 
   steps: { id: string; name: string; description: string }[];
@@ -41,6 +42,9 @@ export default function SetupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdOrgData, setCreatedOrgData] = useState<{name: string} | null>(null);
   const [joinedOrgData, setJoinedOrgData] = useState<{name: string} | null>(null);
+  const [orgFormData, setOrgFormData] = useState<any>(null);
+  const [contactFormData, setContactFormData] = useState<any>(null);
+  const [samePersonForBilling, setSamePersonForBilling] = useState(false);
 
   useEffect(() => {
     if (!isLoading) {
@@ -65,17 +69,19 @@ export default function SetupPage() {
 
   const getSteps = () => [
     { id: "profile", name: "Profile", description: "Complete your professional details" },
-    { id: "choice", name: "Setup", description: "Choose organization path" },
-    { id: "create", name: "Organization", description: "Create your organization" },
-    { id: "join", name: "Join", description: "Join existing organization" },
+    { id: "choice", name: "Setup", description: "Choose organisation path" },
+    { id: "create", name: "Organisation", description: "Create your organisation" },
+    { id: "contact", name: "Contact", description: "Add contact person details" },
+    { id: "join", name: "Join", description: "Join existing organisation" },
   ];
 
   const getCompletedSteps = () => {
     if (currentStep === "profile") return [];
     if (currentStep === "choice") return ["profile"];
     if (currentStep === "create") return ["profile", "choice"];
+    if (currentStep === "contact") return ["profile", "choice", "create"];
     if (currentStep === "join") return ["profile", "choice"];
-    return ["profile", "choice", "create"];
+    return ["profile", "choice", "create", "contact"];
   };
 
   const getErrorMessage = (error: unknown): string => {
@@ -114,10 +120,10 @@ export default function SetupPage() {
     const formData = new FormData(e.target as HTMLFormElement);
     
     try {
-      await createOrganization({
+      // Store organisation data and move to contact step
+      setOrgFormData({
         name: formData.get("name") as string,
         type: formData.get("type") as "pharmacy" | "gp_clinic" | "hospital" | "aged_care",
-        contactPersonName: formData.get("contactPersonName") as string,
         phoneNumber: formData.get("phoneNumber") as string,
         email: formData.get("email") as string,
         website: formData.get("website") as string || undefined,
@@ -128,8 +134,40 @@ export default function SetupPage() {
         abn: formData.get("abn") as string,
       });
       
+      setCurrentStep("contact");
+    } catch (error: unknown) {
+      setError(getErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleContactPerson = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+    
+    const formData = new FormData(e.target as HTMLFormElement);
+    
+    try {
+      // Store contact data
+      const contactData = {
+        contactPersonName: formData.get("contactPersonName") as string,
+        contactPhoneNumber: formData.get("contactPhoneNumber") as string,
+        contactEmail: formData.get("contactEmail") as string,
+        billingPersonName: samePersonForBilling ? formData.get("contactPersonName") as string : formData.get("billingPersonName") as string,
+        billingPhoneNumber: samePersonForBilling ? formData.get("contactPhoneNumber") as string : formData.get("billingPhoneNumber") as string,
+        billingEmail: samePersonForBilling ? formData.get("contactEmail") as string : formData.get("billingEmail") as string,
+      };
+
+      // Now create the organisation with all data
+      await createOrganization({
+        ...orgFormData,
+        ...contactData,
+      });
+      
       setCreatedOrgData({
-        name: formData.get("name") as string,
+        name: orgFormData.name,
       });
       
       // Show success for a moment then redirect
@@ -161,9 +199,9 @@ export default function SetupPage() {
         inviteToken: inviteToken.trim(),
       });
       
-      // Get organization name for success message
-      setJoinedOrgData({
-        name: "Organization", // We'll show a generic success message
+              // Get organisation name for success message
+        setJoinedOrgData({
+          name: "Organisation", // We'll show a generic success message
       });
       
       // Show success for a moment then redirect
@@ -177,11 +215,22 @@ export default function SetupPage() {
     }
   };
 
-  // Success screen for joined organization
+      // Success screen for joined organisation
   if (joinedOrgData) {
     return (
       <div className="grid min-h-screen lg:grid-cols-2">
-        <div className="flex flex-col gap-4 p-6 md:p-8">
+        {/* Left side - Background Image */}
+        <div className="relative hidden lg:flex">
+          <Image
+            src="/PF-login.jpeg"
+            alt="PillFlow Healthcare Platform"
+            fill
+            className="object-cover"
+          />
+        </div>
+        
+        {/* Right side - Success Form */}
+        <div className="flex flex-col gap-4 p-6 md:p-10">
           <div className="flex justify-center gap-2 md:justify-start">
             <Link href="/" className="flex items-center gap-2 font-semibold">
               <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
@@ -192,42 +241,48 @@ export default function SetupPage() {
           </div>
           <div className="flex flex-1 items-center justify-center">
             <div className="w-full max-w-md">
-              <Card>
-                <CardHeader className="text-center pb-4">
-                  <CardTitle className="text-xl text-green-600">🎉 Welcome!</CardTitle>
-                  <CardDescription>
-                    You have successfully joined the organization
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-center space-y-2">
-                    <div className="bg-green-50 border border-green-200 p-4 rounded-md">
-                      <p className="text-sm text-green-800 mb-2">
-                        <strong>Successfully joined organization!</strong>
-                      </p>
-                      <p className="text-sm text-green-700">
-                        You now have access to your organization&apos;s dashboard and can collaborate with your team.
-                      </p>
-                    </div>
+              <div className="text-center mb-6">
+                <h2 className="text-[32px] leading-[32px] font-bold mb-2 text-black">Welcome!</h2>
+                <p className="text-base leading-6 text-black">You have successfully joined the organisation</p>
+              </div>
+              <div className="space-y-4">
+                <div className="text-center space-y-2">
+                  <div className="bg-green-50 border border-green-200 p-4 rounded-md">
+                    <p className="text-sm text-green-800 mb-2">
+                      <strong>Successfully joined organisation!</strong>
+                    </p>
+                    <p className="text-sm text-green-700">
+                      You now have access to your organisation&apos;s dashboard and can collaborate with your team.
+                    </p>
                   </div>
-                  <p className="text-center text-sm text-muted-foreground">
-                    Redirecting to dashboard in a few seconds...
-                  </p>
-                </CardContent>
-              </Card>
+                </div>
+                <p className="text-center text-sm text-muted-foreground">
+                  Redirecting to dashboard in a few seconds...
+                </p>
+              </div>
             </div>
           </div>
         </div>
-        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 relative hidden lg:block"></div>
       </div>
     );
   }
 
-  // Success screen for created organization
+      // Success screen for created organisation
   if (createdOrgData) {
     return (
       <div className="grid min-h-screen lg:grid-cols-2">
-        <div className="flex flex-col gap-4 p-6 md:p-8">
+        {/* Left side - Background Image */}
+        <div className="relative hidden lg:flex">
+          <Image
+            src="/PF-login.jpeg"
+            alt="PillFlow Healthcare Platform"
+            fill
+            className="object-cover"
+          />
+        </div>
+        
+        {/* Right side - Success Form */}
+        <div className="flex flex-col gap-4 p-6 md:p-10">
           <div className="flex justify-center gap-2 md:justify-start">
             <Link href="/" className="flex items-center gap-2 font-semibold">
               <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
@@ -238,34 +293,29 @@ export default function SetupPage() {
           </div>
           <div className="flex flex-1 items-center justify-center">
             <div className="w-full max-w-md">
-              <Card>
-                <CardHeader className="text-center pb-4">
-                  <CardTitle className="text-xl text-green-600">🎉 Success!</CardTitle>
-                  <CardDescription>
-                    Your organization has been successfully created
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-center space-y-2">
-                    <p className="font-medium">{createdOrgData.name}</p>
-                    <div className="bg-green-50 border border-green-200 p-4 rounded-md">
-                      <p className="text-sm text-green-800 mb-2">
-                        <strong>Organization created successfully!</strong>
-                      </p>
-                      <p className="text-sm text-green-700">
-                        You can now invite team members from your organization dashboard.
-                      </p>
-                    </div>
+              <div className="text-center mb-6">
+                <h2 className="text-[32px] leading-[32px] font-bold mb-2 text-black">Success!</h2>
+                <p className="text-base leading-6 text-black">Your organisation has been successfully created</p>
+              </div>
+              <div className="space-y-4">
+                <div className="text-center space-y-2">
+                  <p className="font-medium text-black">{createdOrgData.name}</p>
+                  <div className="bg-green-50 border border-green-200 p-4 rounded-md">
+                    <p className="text-sm text-green-800 mb-2">
+                      <strong>Organisation created successfully!</strong>
+                    </p>
+                    <p className="text-sm text-green-700">
+                      You can now invite team members from your organisation dashboard.
+                    </p>
                   </div>
-                  <p className="text-center text-sm text-muted-foreground">
-                    Redirecting to dashboard in a few seconds...
-                  </p>
-                </CardContent>
-              </Card>
+                </div>
+                <p className="text-center text-sm text-muted-foreground">
+                  Redirecting to dashboard in a few seconds...
+                </p>
+              </div>
             </div>
           </div>
         </div>
-        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 relative hidden lg:block"></div>
       </div>
     );
   }
@@ -283,8 +333,18 @@ export default function SetupPage() {
 
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
-      {/* Left side - Setup Form */}
-      <div className="flex flex-col gap-2 p-4 md:p-6">
+      {/* Left side - Background Image */}
+      <div className="relative hidden lg:flex">
+        <Image
+          src="/PF-login.jpeg"
+          alt="PillFlow Healthcare Platform"
+          fill
+          className="object-cover"
+        />
+      </div>
+      
+      {/* Right side - Setup Form */}
+      <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
           <Link href="/" className="flex items-center gap-2 font-medium">
             <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
@@ -293,16 +353,16 @@ export default function SetupPage() {
             PillFlow
           </Link>
         </div>
-        <div className="flex flex-1 items-center justify-center py-2">
-          <div className="w-full max-w-lg">
-            <div className="text-center mb-4">
-              <h1 className="text-xl font-bold">Complete Your Setup</h1>
-              <p className="text-muted-foreground text-sm mt-1">
-                {currentStep === "profile" && "Complete your professional profile"}
-                {currentStep === "choice" && "Set up your organization"}
-                {currentStep === "create" && "Create your organization"}
-                {currentStep === "join" && "Join existing organization"}
-              </p>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="w-full max-w-md">
+            <div className="text-center mb-6">
+              <h1 className="text-[48px] leading-[48px] font-bold text-black">
+                {currentStep === "profile" && "Complete Your Setup"}
+                {currentStep === "choice" && "Setup Organisation"}
+                {currentStep === "create" && "Create Organisation"}
+                {currentStep === "contact" && "Contact Person"}
+                {currentStep === "join" && "Join Organisation"}
+              </h1>
             </div>
             
             <ProgressIndicator 
@@ -310,469 +370,537 @@ export default function SetupPage() {
               currentStep={currentStep} 
               completedSteps={getCompletedSteps()} 
             />
+            
+            {/* Divider */}
+            <div className="w-full h-px bg-gray-200 mb-6"></div>
 
             {/* Step 1: Complete Profile */}
             {currentStep === "profile" && (
-              <Card>
-                <CardHeader className="text-center pb-4">
-                  <CardTitle className="text-lg">Complete Your Profile</CardTitle>
-                  <CardDescription className="text-sm">
-                    Add your professional details to get started
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleProfileUpdate} className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label htmlFor="firstName" className="text-sm">First Name</Label>
-                        <Input 
-                          id="firstName"
-                          name="firstName"
-                          type="text"
-                          value={userProfile?.firstName || ""}
-                          disabled
-                          className="bg-muted h-9"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="lastName" className="text-sm">Last Name</Label>
-                        <Input 
-                          id="lastName"
-                          name="lastName"
-                          type="text"
-                          value={userProfile?.lastName || ""}
-                          disabled
-                          className="bg-muted h-9"
-                        />
-                      </div>
+              <form onSubmit={handleProfileUpdate} className="space-y-6">
+                <div className="text-center mb-6">
+                  <h2 className="text-[32px] leading-[32px] font-bold mb-2 text-black">Complete Your Profile</h2>
+                  <p className="text-base leading-6 text-black">Add your professional details to get started</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="firstName" className="text-base leading-6">First Name</Label>
+                    <Input 
+                      id="firstName"
+                      name="firstName"
+                      type="text"
+                      value={userProfile?.firstName || ""}
+                      disabled
+                      className="bg-muted h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="lastName" className="text-base leading-6">Last Name</Label>
+                    <Input 
+                      id="lastName"
+                      name="lastName"
+                      type="text"
+                      value={userProfile?.lastName || ""}
+                      disabled
+                      className="bg-muted h-9"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <Label htmlFor="email" className="text-base leading-6">Email</Label>
+                  <Input 
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={userProfile?.email || ""}
+                    disabled
+                    className="bg-muted h-9"
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <Label htmlFor="phoneNumber" className="text-base leading-6">Phone Number *</Label>
+                  <Input 
+                    id="phoneNumber"
+                    name="phoneNumber"
+                    type="tel"
+                    placeholder="+61 4XX XXX XXX"
+                    required
+                    disabled={isSubmitting}
+                    className="h-9"
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <Label htmlFor="aphraRegistrationNumber" className="text-base leading-6">APHRA Registration *</Label>
+                  <Input 
+                    id="aphraRegistrationNumber"
+                    name="aphraRegistrationNumber"
+                    type="text"
+                    placeholder="e.g., DEN0001234567"
+                    required
+                    disabled={isSubmitting}
+                    className="h-9"
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <Label htmlFor="healthcareProfessionalType" className="text-base leading-6">Professional Type *</Label>
+                  <Select name="healthcareProfessionalType" required>
+                    <SelectTrigger className="w-full h-9">
+                      <SelectValue placeholder="Select your profession" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pharmacist">Pharmacist</SelectItem>
+                      <SelectItem value="general_practitioner">General Practitioner</SelectItem>
+                      <SelectItem value="nurse">Nurse</SelectItem>
+                      <SelectItem value="administration">Administration</SelectItem>
+                      <SelectItem value="aged_care_worker">Aged Care Worker</SelectItem>
+                      <SelectItem value="specialist">Specialist</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {error && (
+                  <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md border border-red-200">
+                    <p className="font-medium">Error:</p>
+                    <p>{error}</p>
+                  </div>
+                )}
+                
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="w-full h-9 font-bold"
+                >
+                  {isSubmitting ? "Updating..." : "Continue"}
+                </Button>
+              </form>
+            )}
+
+            {/* Step 2: Choice between create or join organisation */}
+            {currentStep === "choice" && (
+              <div className="space-y-6">
+                <div className="text-center mb-6">
+                  <h2 className="text-[32px] leading-[32px] font-bold mb-2 text-black">Organisation Setup</h2>
+                  <p className="text-base leading-6 text-black">Choose how you want to get started with PillFlow</p>
+                </div>
+                <div className="space-y-6">
+                  {/* Create Organisation Option */}
+                  <div 
+                    className="flex items-center p-6 border border-gray-200 rounded-xl hover:border-primary/50 transition-colors cursor-pointer bg-white"
+                    onClick={() => setCurrentStep("create")}
+                  >
+                    <div className="flex items-center justify-center w-16 h-16 bg-primary/10 rounded-xl mr-6 flex-shrink-0">
+                      <Building2 className="w-8 h-8 text-primary" />
                     </div>
-                    
-                    <div className="space-y-1">
-                      <Label htmlFor="email" className="text-sm">Email</Label>
-                      <Input 
-                        id="email"
-                        name="email"
-                        type="email"
-                        value={userProfile?.email || ""}
-                        disabled
-                        className="bg-muted h-9"
-                      />
+                    <div className="flex-1">
+                      <h3 className="text-lg leading-6 font-semibold text-black mb-2">Create Organisation</h3>
+                      <p className="text-base text-gray-600 leading-6">
+                        Set up a new healthcare organisation and invite your team members.
+                      </p>
                     </div>
-                    
-                    <div className="space-y-1">
-                      <Label htmlFor="phoneNumber" className="text-sm">Phone Number *</Label>
+                  </div>
+
+                  {/* Join Organisation Option */}
+                  <div 
+                    className="flex items-center p-6 border border-gray-200 rounded-xl hover:border-primary/50 transition-colors cursor-pointer bg-white"
+                    onClick={() => setCurrentStep("join")}
+                  >
+                    <div className="flex items-center justify-center w-16 h-16 bg-primary/10 rounded-xl mr-6 flex-shrink-0">
+                      <Users className="w-8 h-8 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg leading-6 font-semibold text-black mb-2">Join Organisation</h3>
+                      <p className="text-base text-gray-600 leading-6">
+                        Join an existing organisation using an invitation token.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
+                  <p className="text-sm text-blue-800">
+                    <strong>💡 Don&apos;t have an invitation token?</strong>
+                  </p>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Ask your organisation administrator to send you an email invitation with a secure token to join their organisation.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Create Organisation */}
+            {currentStep === "create" && (
+              <form onSubmit={handleCreateOrganization} className="space-y-6">
+                <div className="text-center mb-6">
+                  <h2 className="text-[32px] leading-[32px] font-bold mb-2 text-black">Create Organisation</h2>
+                  <p className="text-base leading-6 text-black">Provide details about your healthcare organisation</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-base leading-6">Organisation Name *</Label>
+                  <Input 
+                    id="name"
+                    name="name"
+                    type="text"
+                    placeholder="e.g., Central City Pharmacy"
+                    required
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="type" className="text-base leading-6">Organisation Type *</Label>
+                  <Select name="type" required>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select organisation type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pharmacy">Pharmacy</SelectItem>
+                      <SelectItem value="gp_clinic">GP Clinic</SelectItem>
+                      <SelectItem value="hospital">Hospital</SelectItem>
+                      <SelectItem value="aged_care">Aged Care Facility</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="phoneNumber" className="text-base leading-6">Organisation Phone *</Label>
+                    <Input 
+                      id="phoneNumber"
+                      name="phoneNumber"
+                      type="tel"
+                      placeholder="+61 X XXXX XXXX"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="text-base leading-6">Organisation Email *</Label>
+                    <Input 
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="contact@organisation.com"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="website" className="text-base leading-6">Website</Label>
+                  <Input 
+                    id="website"
+                    name="website"
+                    type="url"
+                    placeholder="https://organisation.com"
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="streetAddress" className="text-base leading-6">Street Address *</Label>
+                  <Input 
+                    id="streetAddress"
+                    name="streetAddress"
+                    type="text"
+                    placeholder="123 Main Street"
+                    required
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="suburb" className="text-base leading-6">Suburb *</Label>
+                    <Input 
+                      id="suburb"
+                      name="suburb"
+                      type="text"
+                      placeholder="Sydney"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                                      <div className="space-y-2">
+                      <Label htmlFor="state" className="text-base leading-6">State *</Label>
+                      <Select name="state" required>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="State" />
+                        </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NSW">NSW</SelectItem>
+                        <SelectItem value="VIC">VIC</SelectItem>
+                        <SelectItem value="QLD">QLD</SelectItem>
+                        <SelectItem value="WA">WA</SelectItem>
+                        <SelectItem value="SA">SA</SelectItem>
+                        <SelectItem value="TAS">TAS</SelectItem>
+                        <SelectItem value="ACT">ACT</SelectItem>
+                        <SelectItem value="NT">NT</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="postcode" className="text-base leading-6">Postcode *</Label>
+                    <Input 
+                      id="postcode"
+                      name="postcode"
+                      type="text"
+                      placeholder="2000"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="abn" className="text-base leading-6">ABN *</Label>
+                  <Input 
+                    id="abn"
+                    name="abn"
+                    type="text"
+                    placeholder="XX XXX XXX XXX"
+                    required
+                    disabled={isSubmitting}
+                  />
+                </div>
+                
+                {error && (
+                  <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
+                    <p className="font-medium">Error:</p>
+                    <p>{error}</p>
+                  </div>
+                )}
+                
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setCurrentStep("choice")}
+                    disabled={isSubmitting}
+                    className="flex-1 font-bold"
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className="flex-1 font-bold"
+                  >
+                    {isSubmitting ? "Saving..." : "Continue"}
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {/* Step 4: Contact Person Details */}
+            {currentStep === "contact" && (
+              <form onSubmit={handleContactPerson} className="space-y-6">
+                <div className="text-center mb-6">
+                  <h2 className="text-[32px] leading-[32px] font-bold mb-2 text-black">Contact Person</h2>
+                  <p className="text-base leading-6 text-black">Add primary contact person details for your organisation</p>
+                </div>
+                
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-black">Primary Contact Person</h3>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="contactPersonName" className="text-base leading-6">Contact Person Name *</Label>
+                    <Input 
+                      id="contactPersonName"
+                      name="contactPersonName"
+                      type="text"
+                      placeholder="Full name"
+                      required
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="contactPhoneNumber" className="text-base leading-6">Phone Number *</Label>
                       <Input 
-                        id="phoneNumber"
-                        name="phoneNumber"
+                        id="contactPhoneNumber"
+                        name="contactPhoneNumber"
                         type="tel"
                         placeholder="+61 4XX XXX XXX"
                         required
                         disabled={isSubmitting}
-                        className="h-9"
                       />
                     </div>
-                    
-                    <div className="space-y-1">
-                      <Label htmlFor="aphraRegistrationNumber" className="text-sm">APHRA Registration *</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="contactEmail" className="text-base leading-6">Email Address *</Label>
                       <Input 
-                        id="aphraRegistrationNumber"
-                        name="aphraRegistrationNumber"
-                        type="text"
-                        placeholder="e.g., DEN0001234567"
+                        id="contactEmail"
+                        name="contactEmail"
+                        type="email"
+                        placeholder="person@organisation.com"
                         required
                         disabled={isSubmitting}
-                        className="h-9"
                       />
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <Label htmlFor="healthcareProfessionalType" className="text-sm">Professional Type *</Label>
-                      <Select name="healthcareProfessionalType" required>
-                        <SelectTrigger className="w-full h-9">
-                          <SelectValue placeholder="Select your profession" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pharmacist">Pharmacist</SelectItem>
-                          <SelectItem value="general_practitioner">General Practitioner</SelectItem>
-                          <SelectItem value="nurse">Nurse</SelectItem>
-                          <SelectItem value="administration">Administration</SelectItem>
-                          <SelectItem value="aged_care_worker">Aged Care Worker</SelectItem>
-                          <SelectItem value="specialist">Specialist</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {error && (
-                      <div className="text-sm text-red-600 bg-red-50 p-2 rounded-md border border-red-200">
-                        <p className="font-medium">Error:</p>
-                        <p>{error}</p>
-                      </div>
-                    )}
-                    
-                    <Button 
-                      type="submit" 
-                      disabled={isSubmitting}
-                      className="w-full h-9"
-                    >
-                      {isSubmitting ? "Updating..." : "Continue"}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Step 2: Choice between create or join organization */}
-            {currentStep === "choice" && (
-              <Card>
-                <CardHeader className="text-center pb-4">
-                  <CardTitle className="text-lg">Organization Setup</CardTitle>
-                  <CardDescription className="text-sm">
-                    Choose how you want to get started with PillFlow
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Create Organization Option */}
-                    <div className="text-center p-6 border-2 border-dashed border-muted-foreground/25 rounded-lg hover:border-primary/50 transition-colors">
-                      <Building2 className="w-12 h-12 text-primary mx-auto mb-4" />
-                      <h3 className="font-semibold mb-2">Create Organization</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Set up a new healthcare organization and invite your team members.
-                      </p>
-                      <Button
-                        type="button"
-                        onClick={() => setCurrentStep("create")}
-                        className="w-full"
-                      >
-                        Create Organization
-                      </Button>
-                    </div>
-
-                    {/* Join Organization Option */}
-                    <div className="text-center p-6 border-2 border-dashed border-muted-foreground/25 rounded-lg hover:border-primary/50 transition-colors">
-                      <Users className="w-12 h-12 text-primary mx-auto mb-4" />
-                      <h3 className="font-semibold mb-2">Join Organization</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Join an existing organization using an invitation token.
-                      </p>
-                      <Button
-                        type="button"
-                        onClick={() => setCurrentStep("join")}
-                        variant="outline"
-                        className="w-full"
-                      >
-                        Join Organization
-                      </Button>
                     </div>
                   </div>
-                  
-                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
-                    <p className="text-sm text-blue-800">
-                      <strong>💡 Don&apos;t have an invitation token?</strong>
-                    </p>
-                    <p className="text-sm text-blue-700 mt-1">
-                      Ask your organization administrator to send you an email invitation with a secure token to join their organization.
-                    </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="samePersonForBilling"
+                      checked={samePersonForBilling}
+                      onCheckedChange={(checked) => setSamePersonForBilling(checked === true)}
+                    />
+                    <Label htmlFor="samePersonForBilling" className="text-base leading-6">
+                      Same person for billing contact
+                    </Label>
                   </div>
-                </CardContent>
-              </Card>
+
+                  {!samePersonForBilling && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-black">Billing Contact Person</h3>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="billingPersonName" className="text-base leading-6">Billing Contact Name *</Label>
+                        <Input 
+                          id="billingPersonName"
+                          name="billingPersonName"
+                          type="text"
+                          placeholder="Full name"
+                          required={!samePersonForBilling}
+                          disabled={isSubmitting}
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="billingPhoneNumber" className="text-base leading-6">Phone Number *</Label>
+                          <Input 
+                            id="billingPhoneNumber"
+                            name="billingPhoneNumber"
+                            type="tel"
+                            placeholder="+61 4XX XXX XXX"
+                            required={!samePersonForBilling}
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="billingEmail" className="text-base leading-6">Email Address *</Label>
+                          <Input 
+                            id="billingEmail"
+                            name="billingEmail"
+                            type="email"
+                            placeholder="billing@organisation.com"
+                            required={!samePersonForBilling}
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {error && (
+                  <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
+                    <p className="font-medium">Error:</p>
+                    <p>{error}</p>
+                  </div>
+                )}
+                
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setCurrentStep("create")}
+                    disabled={isSubmitting}
+                    className="flex-1 font-bold"
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className="flex-1 font-bold"
+                  >
+                    {isSubmitting ? "Creating Organisation..." : "Create Organisation"}
+                  </Button>
+                </div>
+              </form>
             )}
 
-            {/* Step 3: Create Organization */}
-            {currentStep === "create" && (
-              <Card>
-                <CardHeader className="text-center pb-4">
-                  <CardTitle className="text-lg">Create Organization</CardTitle>
-                  <CardDescription className="text-sm">
-                    Provide details about your healthcare organization
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleCreateOrganization} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Organization Name *</Label>
-                      <Input 
-                        id="name"
-                        name="name"
-                        type="text"
-                        placeholder="e.g., Central City Pharmacy"
-                        required
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="type">Organization Type *</Label>
-                      <Select name="type" required>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select organization type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="pharmacy">Pharmacy</SelectItem>
-                          <SelectItem value="gp_clinic">GP Clinic</SelectItem>
-                          <SelectItem value="hospital">Hospital</SelectItem>
-                          <SelectItem value="aged_care">Aged Care Facility</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="contactPersonName">Contact Person *</Label>
-                        <Input 
-                          id="contactPersonName"
-                          name="contactPersonName"
-                          type="text"
-                          placeholder="Primary contact name"
-                          required
-                          disabled={isSubmitting}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phoneNumber">Phone Number *</Label>
-                        <Input 
-                          id="phoneNumber"
-                          name="phoneNumber"
-                          type="tel"
-                          placeholder="+61 X XXXX XXXX"
-                          required
-                          disabled={isSubmitting}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email *</Label>
-                        <Input 
-                          id="email"
-                          name="email"
-                          type="email"
-                          placeholder="contact@organization.com"
-                          required
-                          disabled={isSubmitting}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="website">Website</Label>
-                        <Input 
-                          id="website"
-                          name="website"
-                          type="url"
-                          placeholder="https://organization.com"
-                          disabled={isSubmitting}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="streetAddress">Street Address *</Label>
-                      <Input 
-                        id="streetAddress"
-                        name="streetAddress"
-                        type="text"
-                        placeholder="123 Main Street"
-                        required
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="suburb">Suburb *</Label>
-                        <Input 
-                          id="suburb"
-                          name="suburb"
-                          type="text"
-                          placeholder="Sydney"
-                          required
-                          disabled={isSubmitting}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="state">State *</Label>
-                        <Select name="state" required>
-                          <SelectTrigger>
-                            <SelectValue placeholder="State" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="NSW">NSW</SelectItem>
-                            <SelectItem value="VIC">VIC</SelectItem>
-                            <SelectItem value="QLD">QLD</SelectItem>
-                            <SelectItem value="WA">WA</SelectItem>
-                            <SelectItem value="SA">SA</SelectItem>
-                            <SelectItem value="TAS">TAS</SelectItem>
-                            <SelectItem value="ACT">ACT</SelectItem>
-                            <SelectItem value="NT">NT</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="postcode">Postcode *</Label>
-                        <Input 
-                          id="postcode"
-                          name="postcode"
-                          type="text"
-                          placeholder="2000"
-                          required
-                          disabled={isSubmitting}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="abn">ABN *</Label>
-                      <Input 
-                        id="abn"
-                        name="abn"
-                        type="text"
-                        placeholder="XX XXX XXX XXX"
-                        required
-                        disabled={isSubmitting}
-                      />
-                    </div>
-                    
-                    {error && (
-                      <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
-                        <p className="font-medium">Error:</p>
-                        <p>{error}</p>
-                      </div>
-                    )}
-                    
-                    <div className="flex gap-2">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={() => setCurrentStep("choice")}
-                        disabled={isSubmitting}
-                        className="flex-1"
-                      >
-                        Back
-                      </Button>
-                      <Button 
-                        type="submit" 
-                        disabled={isSubmitting}
-                        className="flex-1"
-                      >
-                        {isSubmitting ? "Creating..." : "Create Organization"}
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Step 3: Join Organization */}
+            {/* Step 3: Join Organisation */}
             {currentStep === "join" && (
-              <Card>
-                <CardHeader className="text-center pb-4">
-                  <CardTitle className="text-lg">Join Organization</CardTitle>
-                  <CardDescription className="text-sm">
-                    Enter your invitation token to join an existing organization
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleJoinOrganization} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="inviteToken">Invitation Token *</Label>
-                      <Input 
-                        id="inviteToken"
-                        name="inviteToken"
-                        type="text"
-                        placeholder="e.g., ABCD-1234-EFGH-5678"
-                        required
-                        disabled={isSubmitting}
-                        className="font-mono"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Enter the invitation token from your organization administrator
-                      </p>
-                    </div>
-                    
-                    <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
-                      <p className="text-sm text-blue-800">
-                        <strong>🔐 How invitation tokens work:</strong>
-                      </p>
-                      <ul className="text-sm text-blue-700 mt-2 space-y-1">
-                        <li>• Tokens are sent via email by your organization administrator</li>
-                        <li>• They expire after 7 days for security</li>
-                        <li>• Each token can only be used once</li>
-                        <li>• Format: XXXX-XXXX-XXXX-XXXX</li>
-                      </ul>
-                    </div>
-                    
-                    {error && (
-                      <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
-                        <p className="font-medium">Error:</p>
-                        <p>{error}</p>
-                      </div>
+              <form onSubmit={handleJoinOrganization} className="space-y-6">
+                <div className="text-center mb-6">
+                  <h2 className="text-[32px] leading-[32px] font-bold mb-2 text-black">Join Organisation</h2>
+                  <p className="text-base leading-6 text-black">Enter your invitation token to join an existing organisation</p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="inviteToken" className="text-base leading-6">Invitation Token *</Label>
+                  <Input 
+                    id="inviteToken"
+                    name="inviteToken"
+                    type="text"
+                    placeholder="e.g., ABCD-1234-EFGH-5678"
+                    required
+                    disabled={isSubmitting}
+                    className="font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enter the invitation token from your organisation administrator
+                  </p>
+                </div>
+                
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
+                  <p className="text-sm text-blue-800">
+                    <strong>🔐 How invitation tokens work:</strong>
+                  </p>
+                  <ul className="text-sm text-blue-700 mt-2 space-y-1">
+                    <li>• Tokens are sent via email by your organisation administrator</li>
+                    <li>• They expire after 7 days for security</li>
+                    <li>• Each token can only be used once</li>
+                    <li>• Format: XXXX-XXXX-XXXX-XXXX</li>
+                  </ul>
+                </div>
+                
+                {error && (
+                  <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md border border-red-200">
+                    <p className="font-medium">Error:</p>
+                    <p>{error}</p>
+                  </div>
+                )}
+                
+                <div className="flex gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setCurrentStep("choice")}
+                    disabled={isSubmitting}
+                    className="flex-1 font-bold"
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className="flex-1 font-bold"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Joining...
+                      </>
+                    ) : (
+                                              "Join Organisation"
                     )}
-                    
-                    <div className="flex gap-2">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={() => setCurrentStep("choice")}
-                        disabled={isSubmitting}
-                        className="flex-1"
-                      >
-                        Back
-                      </Button>
-                      <Button 
-                        type="submit" 
-                        disabled={isSubmitting}
-                        className="flex-1"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                            Joining...
-                          </>
-                        ) : (
-                          "Join Organization"
-                        )}
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
+                  </Button>
+                </div>
+              </form>
             )}
-          </div>
-        </div>
-      </div>
-      
-      {/* Right side - Branding */}
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 relative hidden lg:block">
-        <div className="absolute inset-0 bg-grid-white/10" />
-        <div className="relative flex flex-col justify-center h-full px-8 py-12 text-white">
-          <div className="max-w-md">
-            <h2 className="text-3xl font-bold mb-6">
-              Healthcare Management Made Simple
-            </h2>
-            <p className="text-blue-100 text-lg mb-8">
-              Join thousands of healthcare professionals using PillFlow to streamline their medication management processes.
-            </p>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-white/20 rounded-full p-2">
-                  <Building2 className="w-5 h-5" />
-                </div>
-                <span>Secure organization management</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="bg-white/20 rounded-full p-2">
-                  <Building2 className="w-5 h-5" />
-                </div>
-                <span>Email-based team invitations</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="bg-white/20 rounded-full p-2">
-                  <Building2 className="w-5 h-5" />
-                </div>
-                <span>Professional compliance tracking</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>

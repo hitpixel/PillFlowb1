@@ -42,7 +42,7 @@ export function ShareTokenInput({ onTokenSubmit, className }: ShareTokenInputPro
           Access Shared Patient
         </CardTitle>
         <CardDescription>
-          Enter a share token to access patient data from another organization
+          Enter a share token to access patient data from another organisation
         </CardDescription>
       </CardHeader>
       <CardContent>

@@ -40,7 +40,7 @@ export function ShareTokenModal({ triggerButton }: ShareTokenModalProps) {
       await requestAccess({ shareToken: shareToken.trim() });
       
       toast.success("Access request submitted!", {
-        description: "Your request is pending approval from the patient's organization.",
+        description: "Your request is pending approval from the patient's organisation.",
       });
       
       setOpen(false);
@@ -93,7 +93,7 @@ export function ShareTokenModal({ triggerButton }: ShareTokenModalProps) {
             Access Shared Patient
           </DialogTitle>
           <DialogDescription className="text-base mt-3">
-            Enter a share token to access patient data from another organization
+            Enter a share token to access patient data from another organisation
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">

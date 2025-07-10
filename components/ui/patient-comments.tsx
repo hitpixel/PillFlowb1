@@ -356,7 +356,7 @@ export function PatientComments({ patientId }: PatientCommentsProps) {
                   {formData.isPrivate ? (
                     <>
                       <Lock className="h-3 w-3" />
-                      Private to organization
+                      Private to organisation
                     </>
                   ) : (
                     <>
@@ -371,8 +371,8 @@ export function PatientComments({ patientId }: PatientCommentsProps) {
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
                 {formData.isPrivate 
-                  ? "This message will only be visible to your organization"
-                  : "This message will be shared with all organizations that have access to this patient"
+                                  ? "This message will only be visible to your organisation"
+                : "This message will be shared with all organisations that have access to this patient"
                 }
               </p>
               <Button type="submit" disabled={isSubmitting || !formData.content.trim()}>
