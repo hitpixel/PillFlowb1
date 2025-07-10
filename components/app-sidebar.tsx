@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import {
-  Activity,
   Building2,
   Users,
   FileText,
