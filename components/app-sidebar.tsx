@@ -76,10 +76,6 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
       {
         title: "Patient Groups",
         url: "/patients/groups",
-      },
-      {
-        title: "Assessments",
-        url: "/patients/assessments",
       }
     );
 
@@ -92,31 +88,7 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
     };
   };
 
-  // Medications section - only for pharmacies
-  const medicationsSection = {
-    title: "Medications",
-    url: "/medications",
-    icon: Pill,
-    isActive: false,
-    items: [
-      {
-        title: "Active Medications",
-        url: "/medications/active",
-      },
-      {
-        title: "Medication Library",
-        url: "/medications/library",
-      },
-      {
-        title: "Prescriptions",
-        url: "/medications/prescriptions",
-      },
-      {
-        title: "Interactions",
-        url: "/medications/interactions",
-      },
-    ],
-  };
+
 
   // Webster pack checking section - only for pharmacies
   const websterPackSection = {
@@ -142,26 +114,6 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
 
   // Common sections for all organization types
   const commonSections = [
-    {
-      title: "Compliance",
-      url: "/compliance",
-      icon: Activity,
-      isActive: false,
-      items: [
-        {
-          title: "Adherence Tracking",
-          url: "/compliance/adherence",
-        },
-        {
-          title: "Missed Doses",
-          url: "/compliance/missed",
-        },
-        {
-          title: "Follow-ups",
-          url: "/compliance/followups",
-        },
-      ],
-    },
     {
       title: "Organization",
       url: "#",
@@ -220,7 +172,6 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
   
   // Only add pharmacy-specific sections for pharmacy organizations
   if (organizationType === "pharmacy") {
-    navMain.push(medicationsSection);
     navMain.push(websterPackSection);
   }
   
