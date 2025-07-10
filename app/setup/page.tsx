@@ -42,8 +42,18 @@ export default function SetupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdOrgData, setCreatedOrgData] = useState<{name: string} | null>(null);
   const [joinedOrgData, setJoinedOrgData] = useState<{name: string} | null>(null);
-  const [orgFormData, setOrgFormData] = useState<any>(null);
-  const [contactFormData, setContactFormData] = useState<any>(null);
+  const [orgFormData, setOrgFormData] = useState<{
+    name: string;
+    type: "pharmacy" | "gp_clinic" | "hospital" | "aged_care";
+    phoneNumber: string;
+    email: string;
+    website?: string;
+    streetAddress: string;
+    suburb: string;
+    state: string;
+    postcode: string;
+    abn: string;
+  } | null>(null);
   const [samePersonForBilling, setSamePersonForBilling] = useState(false);
 
   useEffect(() => {
@@ -54,7 +64,7 @@ export default function SetupPage() {
       }
       
       if (setupStatus && !setupStatus.needsSetup) {
-        router.push("/dashboard");
+        router.push("/");
         return;
       }
 
@@ -150,6 +160,10 @@ export default function SetupPage() {
     const formData = new FormData(e.target as HTMLFormElement);
     
     try {
+      if (!orgFormData) {
+        throw new Error("Organisation data is missing");
+      }
+
       // Store contact data
       const contactData = {
         contactPersonName: formData.get("contactPersonName") as string,
@@ -162,7 +176,16 @@ export default function SetupPage() {
 
       // Now create the organisation with all data
       await createOrganization({
-        ...orgFormData,
+        name: orgFormData.name,
+        type: orgFormData.type,
+        phoneNumber: orgFormData.phoneNumber,
+        email: orgFormData.email,
+        website: orgFormData.website,
+        streetAddress: orgFormData.streetAddress,
+        suburb: orgFormData.suburb,
+        state: orgFormData.state,
+        postcode: orgFormData.postcode,
+        abn: orgFormData.abn,
         ...contactData,
       });
       
@@ -172,7 +195,7 @@ export default function SetupPage() {
       
       // Show success for a moment then redirect
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push("/");
       }, 3000);
     } catch (error: unknown) {
       setError(getErrorMessage(error));
@@ -206,7 +229,7 @@ export default function SetupPage() {
       
       // Show success for a moment then redirect
       setTimeout(() => {
-        router.push("/dashboard");
+        router.push("/");
       }, 3000);
     } catch (error: unknown) {
       setError(getErrorMessage(error));
@@ -257,7 +280,7 @@ export default function SetupPage() {
                   </div>
                 </div>
                 <p className="text-center text-sm text-muted-foreground">
-                  Redirecting to dashboard in a few seconds...
+                  Redirecting to main page in a few seconds...
                 </p>
               </div>
             </div>
@@ -310,7 +333,7 @@ export default function SetupPage() {
                   </div>
                 </div>
                 <p className="text-center text-sm text-muted-foreground">
-                  Redirecting to dashboard in a few seconds...
+                  Redirecting to main page in a few seconds...
                 </p>
               </div>
             </div>

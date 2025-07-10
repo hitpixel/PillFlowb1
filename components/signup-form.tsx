@@ -19,7 +19,6 @@ interface SignUpFormProps {
 export function SignUpForm({ className }: SignUpFormProps) {
   const { signIn } = useAuthActions();
   const createUserProfile = useMutation(api.users.createUserProfile);
-  const acceptInvitation = useMutation(api.users.acceptInvitation);
   const router = useRouter();
   const searchParams = useSearchParams();
   
