@@ -15,10 +15,7 @@ interface Patient {
   medicationPreference?: 'webster_pack' | 'bottles' | 'sachets';
 }
 
-interface PatientsExportProps {
-  patients: Patient[];
-  onExportComplete?: () => void;
-}
+
 
 // PDF Document Component
 const PatientsPDFDocument: React.FC<{ patients: Patient[] }> = ({ patients }) => (

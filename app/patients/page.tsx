@@ -83,7 +83,7 @@ export default function PatientsPage() {
     
     try {
       await handleExport();
-    } catch (error) {
+    } catch {
       toast.error("Failed to export patients list");
     }
   };

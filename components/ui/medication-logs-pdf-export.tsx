@@ -43,11 +43,7 @@ interface Patient {
   preferredPack?: 'blister' | 'sachets';
 }
 
-interface MedicationLogsExportProps {
-  logs: MedicationLogEntry[];
-  patient: Patient;
-  onExportComplete?: () => void;
-}
+
 
 // Helper function to get action text
 const getActionText = (actionType: string): string => {

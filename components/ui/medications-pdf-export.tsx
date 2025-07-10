@@ -38,11 +38,7 @@ interface Patient {
   preferredPack?: 'blister' | 'sachets';
 }
 
-interface MedicationsExportProps {
-  medications: Medication[];
-  patient: Patient;
-  onExportComplete?: () => void;
-}
+
 
 // PDF Document Component
 const MedicationsPDFDocument: React.FC<{ medications: Medication[]; patient: Patient }> = ({ 
