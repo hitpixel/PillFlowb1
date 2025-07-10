@@ -25,13 +25,15 @@ import {
   AlertCircle,
   CheckCircle,
   FlaskConical,
-  Layers
+  Layers,
+  Download
 } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { MedicationForm } from "@/components/medication-form";
+import { useMedicationsPDFExport } from "@/components/ui/medications-pdf-export";
 
 interface PatientMedicationsProps {
   patientId: string;
@@ -67,6 +69,7 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingMedication, setEditingMedication] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Query for medications, patient, and current user
   const medications = useQuery(api.patientManagement.getPatientMedications, {
@@ -77,6 +80,16 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   });
   const currentUser = useQuery(api.users.getCurrentUserProfile);
 
+  // PDF Export hook
+  const { handleExport } = useMedicationsPDFExport(
+    medications || [],
+    patient?.patient || null,
+    () => {
+      setIsExporting(false);
+      toast.success("Medications list exported successfully!");
+    }
+  );
+
 
   // Mutations
   const addMedication = useMutation(api.patientManagement.addPatientMedication);
@@ -85,6 +98,23 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
   const approveMedicationRequest = useMutation(api.patientManagement.approveMedicationRequest);
   const rejectMedicationRequest = useMutation(api.patientManagement.rejectMedicationRequest);
   const requestMedicationAddition = useMutation(api.patientManagement.requestMedicationAddition);
+
+  // Handle PDF export
+  const handlePDFExport = async () => {
+    if (!patient?.patient) {
+      toast.error("Patient information not available for export");
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      await handleExport();
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Failed to export medications list");
+      setIsExporting(false);
+    }
+  };
 
   const handleAddMedication = async (data: MedicationFormData) => {
   try {
@@ -355,6 +385,15 @@ export function PatientMedications({ patientId }: PatientMedicationsProps) {
           <Badge variant="outline">
             {medications?.filter(m => isMedicationActive(m)).length || 0} Active
           </Badge>
+          {/* Export Button */}
+          <Button 
+            variant="outline"
+            onClick={handlePDFExport}
+            disabled={isExporting || !medications || medications.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {isExporting ? "Exporting..." : "Export PDF"}
+          </Button>
           {currentUser && (
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>

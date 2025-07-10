@@ -5,6 +5,10 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useMedicationLogsPDFExport } from "@/components/ui/medication-logs-pdf-export";
+import { toast } from "sonner";
+import { useState } from "react";
 import { 
   Pill, 
   Plus, 
@@ -13,7 +17,8 @@ import {
   Trash2,
   Calendar,
   Building2,
-  User
+  User,
+  Download
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -46,9 +51,42 @@ interface MedicationLogEntry {
 }
 
 export function MedicationLog({ patientId }: MedicationLogProps) {
+  const [isExporting, setIsExporting] = useState(false);
+
   const logs = useQuery(api.patientManagement.getPatientMedicationLogs, {
     patientId: patientId as Id<"patients">,
   });
+
+  const patient = useQuery(api.patients.getPatient, {
+    id: patientId as Id<"patients">,
+  });
+
+  // PDF Export hook
+  const { handleExport } = useMedicationLogsPDFExport(
+    logs || [],
+    patient?.patient || null,
+    () => {
+      setIsExporting(false);
+      toast.success("Medication logs exported successfully!");
+    }
+  );
+
+  // Handle PDF export
+  const handlePDFExport = async () => {
+    if (!patient?.patient) {
+      toast.error("Patient information not available for export");
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      await handleExport();
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Failed to export medication logs");
+      setIsExporting(false);
+    }
+  };
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString('en-AU', {
@@ -171,15 +209,26 @@ export function MedicationLog({ patientId }: MedicationLogProps) {
   }
 
   return (
-    <div className="space-y-4">
+          <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Pill className="h-5 w-5" />
           <h3 className="text-lg font-semibold">Medication Log</h3>
         </div>
-        <Badge variant="outline">
-          {logs.length} {logs.length === 1 ? 'Entry' : 'Entries'}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline">
+            {logs.length} {logs.length === 1 ? 'Entry' : 'Entries'}
+          </Badge>
+          {/* Export Button */}
+          <Button 
+            variant="outline"
+            onClick={handlePDFExport}
+            disabled={isExporting || !logs || logs.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {isExporting ? "Exporting..." : "Export PDF"}
+          </Button>
+        </div>
       </div>
 
       {logs.length === 0 ? (

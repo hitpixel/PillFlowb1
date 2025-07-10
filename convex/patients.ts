@@ -520,6 +520,26 @@ export const getPatientStats = query({
     
     const patientsThisMonth = allPatients.filter(p => p.createdAt >= thisMonthTimestamp).length;
 
+    // Calculate historical data for last 6 months
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const monthlyData = [];
+    
+    for (let i = 0; i < 6; i++) {
+      const monthStart = new Date(sixMonthsAgo.getFullYear(), sixMonthsAgo.getMonth() + i, 1);
+      const monthEnd = new Date(sixMonthsAgo.getFullYear(), sixMonthsAgo.getMonth() + i + 1, 0, 23, 59, 59);
+      
+      const monthPatients = allPatients.filter(p => 
+        p.createdAt >= monthStart.getTime() && p.createdAt <= monthEnd.getTime()
+      ).length;
+      
+      monthlyData.push({
+        month: monthStart.toLocaleDateString('en-AU', { month: 'short' }),
+        patients: monthPatients,
+        cumulativePatients: allPatients.filter(p => p.createdAt <= monthEnd.getTime()).length
+      });
+    }
+
     return {
       totalPatients,
       patientsThisMonth,
@@ -527,6 +547,71 @@ export const getPatientStats = query({
         blister: blisterPreference,
         sachets: sachetsPreference,
       },
+      monthlyData,
+    };
+  },
+});
+
+// Get medication statistics for dashboard
+export const getMedicationStats = query({
+  args: {},
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization to view statistics");
+    }
+
+    // Get all active medications in the organization
+    const allMedications = await ctx.db
+      .query("patientMedications")
+      .withIndex("by_organization", (q) => q.eq("organizationId", userProfile.organizationId!))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    const totalMedications = allMedications.length;
+    
+    // Medications added this month
+    const thisMonth = new Date();
+    thisMonth.setDate(1);
+    thisMonth.setHours(0, 0, 0, 0);
+    const thisMonthTimestamp = thisMonth.getTime();
+    
+    const medicationsThisMonth = allMedications.filter(m => m.addedAt >= thisMonthTimestamp).length;
+
+    // Calculate historical data for last 6 months
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const monthlyData = [];
+    
+    for (let i = 0; i < 6; i++) {
+      const monthStart = new Date(sixMonthsAgo.getFullYear(), sixMonthsAgo.getMonth() + i, 1);
+      const monthEnd = new Date(sixMonthsAgo.getFullYear(), sixMonthsAgo.getMonth() + i + 1, 0, 23, 59, 59);
+      
+      const monthMedications = allMedications.filter(m => 
+        m.addedAt >= monthStart.getTime() && m.addedAt <= monthEnd.getTime()
+      ).length;
+      
+      monthlyData.push({
+        month: monthStart.toLocaleDateString('en-AU', { month: 'short' }),
+        medications: monthMedications,
+        cumulativeMedications: allMedications.filter(m => m.addedAt <= monthEnd.getTime()).length
+      });
+    }
+
+    return {
+      totalMedications,
+      medicationsThisMonth,
+      monthlyData,
     };
   },
 });

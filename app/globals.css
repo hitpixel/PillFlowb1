@@ -148,3 +148,22 @@
     font-family: 'Poppins', ui-sans-serif, system-ui, sans-serif;
   }
 }
+
+/* Aurora Animation */
+@keyframes aurora {
+  0% {
+    background-position: 50% 50%, 50% 50%;
+  }
+  100% {
+    background-position: 350% 50%, 350% 50%;
+  }
+}
+
+.animate-aurora {
+  animation: aurora 60s linear infinite;
+}
+
+/* Direct Aurora Card Animation */
+.aurora-card-animated::after {
+  animation: aurora 20s linear infinite;
+}

@@ -13,7 +13,8 @@ import {
   Users, 
   Grid, 
   List,
-  Building2
+  Building2,
+  Download
 } from "lucide-react";
 import Link from "next/link";
 import { PatientCard } from "@/components/ui/patient-card";
@@ -35,6 +36,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { toast } from "sonner";
+import { usePatientsPDFExport } from "@/components/ui/patients-pdf-export";
 
 export default function PatientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -64,6 +66,27 @@ export default function PatientsPage() {
 
   // Check if current organization can add patients (only pharmacies)
   const canAddPatients = organization?.type === "pharmacy";
+
+  // PDF Export functionality
+  const { handleExport } = usePatientsPDFExport(
+    displayPatients || [],
+    () => {
+      toast.success("Patients list exported successfully");
+    }
+  );
+
+  const handlePDFExport = async () => {
+    if (!displayPatients || displayPatients.length === 0) {
+      toast.error("No patients to export");
+      return;
+    }
+    
+    try {
+      await handleExport();
+    } catch (error) {
+      toast.error("Failed to export patients list");
+    }
+  };
 
   return (
     <SidebarProvider>
@@ -104,6 +127,14 @@ export default function PatientsPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handlePDFExport}
+                    disabled={!displayPatients || displayPatients.length === 0}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Export PDF
+                  </Button>
                   <ShareTokenModal />
                   {canAddPatients && (
                     <Link href="/patients/new">
