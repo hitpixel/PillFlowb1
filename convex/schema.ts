@@ -469,4 +469,46 @@ export default defineSchema({
     .index("by_checked_at", ["checkedAt"])
     .index("by_active", ["isActive"]),
 
+  // Webster pack scan outs for dispatch tracking
+  websterPackScanOuts: defineTable({
+    patientId: v.id("patients"),
+    websterPackId: v.string(), // Webster pack identifier/barcode
+    packType: v.union(
+      v.literal("blister"),
+      v.literal("sachets")
+    ),
+    numberOfPacks: v.optional(v.number()), // Number of packs being scanned out
+    memberInitials: v.optional(v.string()), // Staff member initials who performed scan out
+    deliveryMethod: v.union(
+      v.literal("pickup"),
+      v.literal("delivery"),
+      v.literal("courier")
+    ),
+    deliveryAddress: v.optional(v.string()), // Delivery address if not pickup
+    deliveryNotes: v.optional(v.string()), // Special delivery instructions
+    scanOutStatus: v.union(
+      v.literal("dispatched"),
+      v.literal("collected"),
+      v.literal("failed")
+    ),
+    notes: v.optional(v.string()), // General notes about the scan out
+    recipientName: v.optional(v.string()), // Who received the pack
+    recipientSignature: v.optional(v.string()), // Signature if collected
+    scannedOutBy: v.id("userProfiles"),
+    scannedOutByOrg: v.id("organizations"),
+    scannedOutAt: v.float64(),
+    // Patient details at time of scan out (for historical record)
+    patientName: v.string(),
+    patientShareToken: v.string(),
+    isActive: v.boolean(),
+  })
+    .index("by_patient", ["patientId"])
+    .index("by_webster_pack_id", ["websterPackId"])
+    .index("by_pack_type", ["packType"])
+    .index("by_delivery_method", ["deliveryMethod"])
+    .index("by_scan_out_status", ["scanOutStatus"])
+    .index("by_scanned_out_by", ["scannedOutBy"])
+    .index("by_scanned_out_at", ["scannedOutAt"])
+    .index("by_active", ["isActive"]),
+
 });

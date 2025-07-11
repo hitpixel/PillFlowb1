@@ -92,21 +92,17 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
   // Webster pack checking section - only for pharmacies
   const websterPackSection = {
     title: "Webster Packs",
-    url: "/webster-packs",
+    url: "#",
     icon: Shield,
     isActive: false,
     items: [
       {
-        title: "Pack Checking",
-        url: "/webster-packs",
+        title: "Checking Packs",
+        url: "/webster-packs/checking-packs",
       },
       {
-        title: "Quality Reports",
-        url: "/webster-packs/reports",
-      },
-      {
-        title: "Pack History",
-        url: "/webster-packs/history",
+        title: "Scan Out",
+        url: "/webster-packs/scan-out",
       },
     ],
   };

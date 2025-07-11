@@ -27,8 +27,10 @@ export const polar = new Polar(components.polar, {
   // Optional: Configure static keys for referencing your v4s.
   // Map your product keys to Polar product IDs
   products: {
-    // Standard Plan product from Polar Production
-    standard: "5e14210e-3208-4167-8cd6-d83825c60484",
+    // Pharmacy Plan product from Polar Production
+    pharmacy: "5e14210e-3208-4167-8cd6-d83825c60484",
+    // GP Clinic Plan product from Polar Production
+    gp_clinic: "9daf79bd-9e08-45f0-ab4d-da1f69288ce4",
   },
   // Explicitly set to production server
   server: "production",
@@ -182,4 +184,81 @@ export const getOrganizationWithSubscription = query({
       userRole: userProfile.role,
     };
   },
-}); 
+});
+
+// Get organization-specific pricing details
+export const getOrganizationPricingDetails = query({
+  handler: async (ctx) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      return null;
+    }
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      return null;
+    }
+
+    const organization = await ctx.db.get(userProfile.organizationId);
+    if (!organization) {
+      return null;
+    }
+
+    // Get organization-specific product and discount details
+    const getProductDetails = (orgType: string) => {
+      switch (orgType) {
+                 case "pharmacy":
+           return {
+             productKey: "pharmacy",
+             productId: "5e14210e-3208-4167-8cd6-d83825c60484",
+             discountCode: "O5L1G6YF",
+             planName: "Pharmacy Plan",
+             price: 99.99,
+             freeTrialMonths: 1,
+             features: [
+               "Webster pack checking & scan out",
+               "Patient medication management",
+               "Unlimited team members",
+               "Priority support",
+               "Quality control reports"
+             ]
+           };
+                 case "gp_clinic":
+           return {
+             productKey: "gp_clinic",
+             productId: "9daf79bd-9e08-45f0-ab4d-da1f69288ce4",
+             discountCode: "6NFLM0T2",
+             planName: "GP Clinic Plan",
+             price: 99.99,
+             freeTrialMonths: 3,
+             features: [
+               "Patient management & access",
+               "Medication monitoring",
+               "Unlimited team members",
+               "Priority support",
+               "Clinical reports"
+             ]
+           };
+        default:
+          return null;
+      }
+    };
+
+    const productDetails = getProductDetails(organization.type);
+    if (!productDetails) {
+      return null;
+    }
+
+    return {
+      organizationType: organization.type,
+      ...productDetails,
+      isOwner: userProfile.role === "owner",
+    };
+  },
+});
+
+ 

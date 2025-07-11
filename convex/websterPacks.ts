@@ -513,4 +513,317 @@ async function checkPatientAccess(
   }
 
   return false;
-} 
+}
+
+// Create a new Webster pack scan out
+export const createWebsterPackScanOut = mutation({
+  args: {
+    patientId: v.id("patients"),
+    websterPackId: v.string(),
+    packType: v.union(v.literal("blister"), v.literal("sachets")),
+    numberOfPacks: v.optional(v.number()),
+    memberInitials: v.optional(v.string()),
+    deliveryMethod: v.union(
+      v.literal("pickup"),
+      v.literal("delivery"),
+      v.literal("courier")
+    ),
+    deliveryAddress: v.optional(v.string()),
+    deliveryNotes: v.optional(v.string()),
+    scanOutStatus: v.union(
+      v.literal("dispatched"),
+      v.literal("collected"),
+      v.literal("failed")
+    ),
+    notes: v.optional(v.string()),
+    recipientName: v.optional(v.string()),
+    recipientSignature: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization");
+    }
+
+    // Get organization to verify it's a pharmacy
+    const organization = await ctx.db.get(userProfile.organizationId);
+    if (!organization || organization.type !== "pharmacy") {
+      throw new Error("Webster pack scan out is only available to pharmacy organizations");
+    }
+
+    // Get patient details
+    const patient = await ctx.db.get(args.patientId);
+    if (!patient) {
+      throw new Error("Patient not found");
+    }
+
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Access denied: You don't have permission to scan out packs for this patient");
+    }
+
+    const now = Date.now();
+
+    // Create the Webster pack scan out record
+    const scanOutId = await ctx.db.insert("websterPackScanOuts", {
+      patientId: args.patientId,
+      websterPackId: args.websterPackId,
+      packType: args.packType,
+      numberOfPacks: args.numberOfPacks || 1,
+      memberInitials: args.memberInitials || "",
+      deliveryMethod: args.deliveryMethod,
+      deliveryAddress: args.deliveryAddress,
+      deliveryNotes: args.deliveryNotes,
+      scanOutStatus: args.scanOutStatus,
+      notes: args.notes,
+      recipientName: args.recipientName,
+      recipientSignature: args.recipientSignature,
+      scannedOutBy: userProfile._id,
+      scannedOutByOrg: userProfile.organizationId,
+      scannedOutAt: now,
+      patientName: `${patient.firstName} ${patient.lastName}`,
+      patientShareToken: patient.shareToken,
+      isActive: true,
+    });
+
+    // Log the scan out in patient comments
+    const statusText = args.scanOutStatus === "dispatched" ? "dispatched" : 
+                      args.scanOutStatus === "collected" ? "collected" : "failed to dispatch";
+    
+    let commentContent = `Webster pack ${args.websterPackId} ${statusText} via ${args.deliveryMethod}`;
+    if (args.recipientName) {
+      commentContent += ` to ${args.recipientName}`;
+    }
+    if (args.notes) {
+      commentContent += `\nNotes: ${args.notes}`;
+    }
+
+    await ctx.db.insert("patientComments", {
+      patientId: args.patientId,
+      authorId: userProfile._id,
+      authorOrg: userProfile.organizationId,
+      content: commentContent,
+      commentType: "system",
+      isPrivate: false,
+      isActive: true,
+      createdAt: now,
+    });
+
+    return scanOutId;
+  },
+});
+
+// Get Webster pack scan out statistics
+export const getWebsterScanOutStats = query({
+  args: {},
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization");
+    }
+
+    // Get organization to verify it's a pharmacy
+    const organization = await ctx.db.get(userProfile.organizationId);
+    if (!organization || organization.type !== "pharmacy") {
+      throw new Error("Webster pack scan out is only available to pharmacy organizations");
+    }
+
+    // Get all scan outs from the organization
+    const allScanOuts = await ctx.db
+      .query("websterPackScanOuts")
+      .withIndex("by_scanned_out_by")
+      .filter((q) => q.eq(q.field("scannedOutByOrg"), userProfile.organizationId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    // Calculate statistics
+    const totalScanOuts = allScanOuts.length;
+    const dispatchedCount = allScanOuts.filter(s => s.scanOutStatus === "dispatched").length;
+    const collectedCount = allScanOuts.filter(s => s.scanOutStatus === "collected").length;
+    const failedCount = allScanOuts.filter(s => s.scanOutStatus === "failed").length;
+    
+    // Today's scan outs
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayTimestamp = today.getTime();
+    const todayScanOuts = allScanOuts.filter(s => s.scannedOutAt >= todayTimestamp).length;
+
+    // This week's scan outs
+    const weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+    const weekScanOuts = allScanOuts.filter(s => s.scannedOutAt >= weekAgo).length;
+
+    return {
+      totalScanOuts,
+      dispatchedCount,
+      collectedCount,
+      failedCount,
+      todayScanOuts,
+      weekScanOuts,
+      successRate: totalScanOuts > 0 ? Math.round(((dispatchedCount + collectedCount) / totalScanOuts) * 100) : 0,
+    };
+  },
+});
+
+// Get recent Webster pack scan outs
+export const getRecentWebsterScanOuts = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization");
+    }
+
+    // Get organization to verify it's a pharmacy
+    const organization = await ctx.db.get(userProfile.organizationId);
+    if (!organization || organization.type !== "pharmacy") {
+      throw new Error("Webster pack scan out is only available to pharmacy organizations");
+    }
+
+    // Get recent scan outs from the same organization
+    const scanOuts = await ctx.db
+      .query("websterPackScanOuts")
+      .withIndex("by_scanned_out_at")
+      .filter((q) => q.eq(q.field("scannedOutByOrg"), userProfile.organizationId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .order("desc")
+      .take(args.limit || 20);
+
+    // Get scanner details for each scan out
+    const scanOutsWithDetails = await Promise.all(
+      scanOuts.map(async (scanOut) => {
+        const scanner = await ctx.db.get(scanOut.scannedOutBy);
+        
+        return {
+          ...scanOut,
+          scannerName: scanner ? `${scanner.firstName} ${scanner.lastName}` : "Unknown User",
+        };
+      })
+    );
+
+    return scanOutsWithDetails;
+  },
+});
+
+// Check if Webster pack has been checked before scan out
+export const getWebsterPackCheckStatus = query({
+  args: {
+    websterPackId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization");
+    }
+
+    // Get organization to verify it's a pharmacy
+    const organization = await ctx.db.get(userProfile.organizationId);
+    if (!organization || organization.type !== "pharmacy") {
+      throw new Error("Webster pack checking is only available to pharmacy organizations");
+    }
+
+    // Find the most recent check for this Webster pack
+    const websterCheck = await ctx.db
+      .query("websterPackChecks")
+      .withIndex("by_webster_pack_id")
+      .filter((q) => q.eq(q.field("websterPackId"), args.websterPackId))
+      .filter((q) => q.eq(q.field("checkedByOrg"), userProfile.organizationId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .order("desc")
+      .first();
+
+    if (!websterCheck) {
+      return {
+        isChecked: false,
+        canScanOut: false,
+        message: "Webster pack has not been checked yet",
+      };
+    }
+
+    // Check if the pack passed the quality check
+    if (websterCheck.checkStatus === "passed") {
+      return {
+        isChecked: true,
+        canScanOut: true,
+        message: "Webster pack has passed quality check",
+        checkDetails: {
+          checkStatus: websterCheck.checkStatus,
+          checkedAt: websterCheck.checkedAt,
+          checkedBy: websterCheck.checkedBy,
+          patientName: websterCheck.patientName,
+          notes: websterCheck.notes,
+        },
+      };
+    } else if (websterCheck.checkStatus === "failed") {
+      return {
+        isChecked: true,
+        canScanOut: false,
+        message: "Webster pack failed quality check and cannot be scanned out",
+        checkDetails: {
+          checkStatus: websterCheck.checkStatus,
+          checkedAt: websterCheck.checkedAt,
+          checkedBy: websterCheck.checkedBy,
+          patientName: websterCheck.patientName,
+          notes: websterCheck.notes,
+          issues: websterCheck.issues,
+        },
+      };
+    } else {
+      return {
+        isChecked: true,
+        canScanOut: false,
+        message: "Webster pack requires review before scan out",
+        checkDetails: {
+          checkStatus: websterCheck.checkStatus,
+          checkedAt: websterCheck.checkedAt,
+          checkedBy: websterCheck.checkedBy,
+          patientName: websterCheck.patientName,
+          notes: websterCheck.notes,
+          issues: websterCheck.issues,
+        },
+      };
+    }
+  },
+}); 

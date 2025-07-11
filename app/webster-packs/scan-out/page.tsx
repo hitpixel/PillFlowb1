@@ -12,17 +12,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { 
-  PackageCheck, 
+  PackageOpen, 
   Search, 
-  Save, 
+  Send, 
   CheckCircle2, 
   XCircle, 
-  AlertTriangle,
   Clock,
   Package,
   User,
   Calendar,
-  BarChart3
+  Truck,
+  MapPin
 } from "lucide-react";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -47,16 +47,18 @@ interface SelectedPatient {
   name: string;
   shareToken: string;
   preferredPack: string;
+  address?: string;
+  phone?: string;
 }
 
-export default function WebsterPacksPage() {
+export default function ScanOutPage() {
   // Queries
   const organization = useQuery(api.users.getOrganization);
-  const recentChecks = useQuery(api.websterPacks.getRecentWebsterChecks, { limit: 10 });
-  const stats = useQuery(api.websterPacks.getWebsterCheckStats);
+  const recentScanOuts = useQuery(api.websterPacks.getRecentWebsterScanOuts, { limit: 10 });
+  const scanOutStats = useQuery(api.websterPacks.getWebsterScanOutStats);
   
   // Mutations
-  const createCheck = useMutation(api.websterPacks.createWebsterPackCheck);
+  const createScanOut = useMutation(api.websterPacks.createWebsterPackScanOut);
   
   // Multi-step form state
   const [currentStep, setCurrentStep] = useState(1);
@@ -64,24 +66,24 @@ export default function WebsterPacksPage() {
     // Step 1: Patient & Pack Details
     websterPackId: "",
     packType: "blister" as "blister" | "sachets",
+    numberOfPacks: 1,
+    memberInitials: "",
     
-    // Step 2: Medication Verification
-    medicationVerified: false,
+    // Step 2: Delivery Details
+    deliveryMethod: "pickup" as "pickup" | "delivery" | "courier",
+    deliveryAddress: "",
+    deliveryNotes: "",
     
-    // Step 3: Final Check
-    checkStatus: "passed" as "passed" | "failed" | "requires_review",
+    // Step 3: Final Confirmation
+    scanOutStatus: "dispatched" as "dispatched" | "collected" | "failed",
     notes: "",
-    issues: [] as string[],
-    medicationCount: "",
-    packWeight: "",
-    batchNumber: "",
-    expiryDate: "",
+    recipientName: "",
+    recipientSignature: "",
   });
   
   // Form state
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<SelectedPatient | null>(null);
-  const [newIssue, setNewIssue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Patient search
@@ -90,10 +92,10 @@ export default function WebsterPacksPage() {
     searchTerm.trim() ? { searchTerm: searchTerm.trim(), limit: 10 } : "skip"
   );
 
-  // Get patient medications by time (for step 2)
-  const patientMedications = useQuery(
-    api.websterPacks.getPatientMedicationsByTime,
-    selectedPatient && currentStep >= 2 ? { patientId: selectedPatient._id } : "skip"
+  // Check if Webster pack has been checked
+  const websterPackCheck = useQuery(
+    api.websterPacks.getWebsterPackCheckStatus,
+    formData.websterPackId.trim() ? { websterPackId: formData.websterPackId.trim() } : "skip"
   );
 
   // Check if user has access (pharmacy organizations only)
@@ -105,24 +107,9 @@ export default function WebsterPacksPage() {
     // Set default pack type based on patient preference
     setFormData(prev => ({
       ...prev,
-      packType: patient.preferredPack as "blister" | "sachets"
-    }));
-  };
-
-  const handleAddIssue = () => {
-    if (newIssue.trim() && !formData.issues.includes(newIssue.trim())) {
-      setFormData(prev => ({
-        ...prev,
-        issues: [...prev.issues, newIssue.trim()]
-      }));
-      setNewIssue("");
-    }
-  };
-
-  const handleRemoveIssue = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      issues: prev.issues.filter((_, i) => i !== index)
+      packType: patient.preferredPack as "blister" | "sachets",
+      deliveryAddress: patient.address || "",
+      recipientName: patient.name
     }));
   };
 
@@ -139,6 +126,27 @@ export default function WebsterPacksPage() {
       return;
     }
 
+    if (!formData.memberInitials.trim()) {
+      toast.error("Member Initials are required");
+      return;
+    }
+
+    if (formData.numberOfPacks < 1) {
+      toast.error("Number of packs must be at least 1");
+      return;
+    }
+
+    // Check if Webster pack has been checked
+    if (websterPackCheck && !websterPackCheck.canScanOut) {
+      toast.error(websterPackCheck.message);
+      return;
+    }
+
+    if (!websterPackCheck) {
+      toast.error("Please enter a valid Webster Pack ID to check its status");
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
@@ -146,18 +154,20 @@ export default function WebsterPacksPage() {
         patientId: selectedPatient._id,
         websterPackId: formData.websterPackId.trim(),
         packType: formData.packType,
-        checkStatus: formData.checkStatus,
+        numberOfPacks: formData.numberOfPacks,
+        memberInitials: formData.memberInitials.trim(),
+        deliveryMethod: formData.deliveryMethod,
+        deliveryAddress: formData.deliveryAddress.trim() || undefined,
+        deliveryNotes: formData.deliveryNotes.trim() || undefined,
+        scanOutStatus: formData.scanOutStatus,
         notes: formData.notes.trim() || undefined,
-        issues: formData.issues.length > 0 ? formData.issues : undefined,
-        medicationCount: formData.medicationCount ? parseInt(formData.medicationCount) : undefined,
-        packWeight: formData.packWeight ? parseFloat(formData.packWeight) : undefined,
-        batchNumber: formData.batchNumber.trim() || undefined,
-        expiryDate: formData.expiryDate || undefined,
+        recipientName: formData.recipientName.trim() || undefined,
+        recipientSignature: formData.recipientSignature.trim() || undefined,
       };
 
-      await createCheck(submitData);
+      await createScanOut(submitData);
       
-      toast.success("Webster pack check recorded successfully!");
+      toast.success("Webster pack scan out recorded successfully!");
       
       // Reset form
       setSelectedPatient(null);
@@ -165,19 +175,20 @@ export default function WebsterPacksPage() {
       setFormData({
         websterPackId: "",
         packType: "blister",
-        medicationVerified: false,
-        checkStatus: "passed",
+        numberOfPacks: 1,
+        memberInitials: "",
+        deliveryMethod: "pickup",
+        deliveryAddress: "",
+        deliveryNotes: "",
+        scanOutStatus: "dispatched",
         notes: "",
-        issues: [],
-        medicationCount: "",
-        packWeight: "",
-        batchNumber: "",
-        expiryDate: "",
+        recipientName: "",
+        recipientSignature: "",
       });
       
     } catch (error) {
-      console.error("Error creating Webster pack check:", error);
-      toast.error("Failed to record pack check. Please try again.");
+      console.error("Error creating Webster pack scan out:", error);
+      toast.error("Failed to record scan out. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -185,18 +196,18 @@ export default function WebsterPacksPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "passed": return "text-green-600 bg-green-50 border-green-200";
+      case "dispatched": return "text-blue-600 bg-blue-50 border-blue-200";
+      case "collected": return "text-green-600 bg-green-50 border-green-200";
       case "failed": return "text-red-600 bg-red-50 border-red-200";
-      case "requires_review": return "text-yellow-600 bg-yellow-50 border-yellow-200";
       default: return "text-gray-600 bg-gray-50 border-gray-200";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "passed": return <CheckCircle2 className="h-4 w-4" />;
+      case "dispatched": return <Truck className="h-4 w-4" />;
+      case "collected": return <CheckCircle2 className="h-4 w-4" />;
       case "failed": return <XCircle className="h-4 w-4" />;
-      case "requires_review": return <AlertTriangle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
     }
   };
@@ -207,15 +218,15 @@ export default function WebsterPacksPage() {
         <AppSidebar />
         <SidebarInset>
           <div className="p-6 text-center">
-            <PackageCheck className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <PackageOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-gray-900 mb-4">
               Access Restricted
             </h1>
             <p className="text-muted-foreground mb-4">
-              Webster pack checking is only available to pharmacy organizations.
+              Webster pack scan out is only available to pharmacy organisations.
             </p>
             <p className="text-sm text-muted-foreground">
-              Your organization type: {organization?.type?.replace("_", " ") || "Unknown"}
+              Your organisation type: {organization?.type?.replace("_", " ") || "Unknown"}
             </p>
           </div>
         </SidebarInset>
@@ -242,8 +253,14 @@ export default function WebsterPacksPage() {
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbItem className="hidden md:block">
+                  <BreadcrumbLink href="/webster-packs">
+                    Webster Packs
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Webster Pack Checking</BreadcrumbPage>
+                  <BreadcrumbPage>Scan Out</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
@@ -256,55 +273,55 @@ export default function WebsterPacksPage() {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center gap-4">
                 <div className="bg-primary/10 p-3 rounded-lg">
-                  <PackageCheck className="w-8 h-8 text-primary" />
+                  <PackageOpen className="w-8 h-8 text-primary" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">Webster Pack Checking</h1>
+                  <h1 className="text-3xl font-bold">Scan Out</h1>
                   <p className="text-muted-foreground">
-                    Quality control and verification for Webster packs
+                    Dispatch and track Webster packs to patients
                   </p>
                 </div>
               </div>
             </div>
 
             {/* Statistics Cards */}
-            {stats && (
+            {scanOutStats && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Checks</CardTitle>
+                    <CardTitle className="text-sm font-medium">Total Scan Outs</CardTitle>
                     <Package className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{stats.totalChecks}</div>
+                    <div className="text-2xl font-bold">{scanOutStats.totalScanOuts}</div>
                     <p className="text-xs text-muted-foreground">
-                      {stats.todayChecks} today
+                      {scanOutStats.todayScanOuts} today
                     </p>
                   </CardContent>
                 </Card>
                 
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Pass Rate</CardTitle>
-                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                    <CardTitle className="text-sm font-medium">Dispatched</CardTitle>
+                    <Truck className="h-4 w-4 text-blue-500" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{stats.passRate}%</div>
+                    <div className="text-2xl font-bold text-blue-600">{scanOutStats.dispatchedCount}</div>
                     <p className="text-xs text-muted-foreground">
-                      {stats.passedChecks} passed
+                      pending collection
                     </p>
                   </CardContent>
                 </Card>
                 
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Failed Checks</CardTitle>
-                    <XCircle className="h-4 w-4 text-red-500" />
+                    <CardTitle className="text-sm font-medium">Collected</CardTitle>
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-red-600">{stats.failedChecks}</div>
+                    <div className="text-2xl font-bold text-green-600">{scanOutStats.collectedCount}</div>
                     <p className="text-xs text-muted-foreground">
-                      {stats.reviewChecks} need review
+                      successfully delivered
                     </p>
                   </CardContent>
                 </Card>
@@ -315,9 +332,9 @@ export default function WebsterPacksPage() {
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{stats.weekChecks}</div>
+                    <div className="text-2xl font-bold">{scanOutStats.weekScanOuts}</div>
                     <p className="text-xs text-muted-foreground">
-                      checks completed
+                      packs dispatched
                     </p>
                   </CardContent>
                 </Card>
@@ -325,18 +342,18 @@ export default function WebsterPacksPage() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Multi-Step Webster Pack Check Form */}
+              {/* Multi-Step Webster Pack Scan Out Form */}
               <div className="lg:col-span-2">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <span>Pack Check Verification</span>
+                      <span>Pack Scan Out</span>
                       <Badge variant="outline">Step {currentStep} of 3</Badge>
                     </CardTitle>
                     <CardDescription>
                       {currentStep === 1 && "Search for a patient and enter pack details"}
-                      {currentStep === 2 && "Verify patient medication schedule"}
-                      {currentStep === 3 && "Final confirmation and quality check"}
+                      {currentStep === 2 && "Configure delivery method and address"}
+                      {currentStep === 3 && "Final confirmation and dispatch"}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -358,7 +375,7 @@ export default function WebsterPacksPage() {
                           }`}>
                             2
                           </div>
-                          <span className="font-medium">Medication Check</span>
+                          <span className="font-medium">Delivery Details</span>
                         </div>
                         <div className={`flex-1 h-0.5 mx-4 ${currentStep >= 3 ? 'bg-blue-600' : 'bg-gray-200'}`}></div>
                         <div className={`flex items-center gap-2 ${currentStep >= 3 ? 'text-blue-600' : 'text-gray-400'}`}>
@@ -367,7 +384,7 @@ export default function WebsterPacksPage() {
                           }`}>
                             3
                           </div>
-                          <span className="font-medium">Final Check</span>
+                          <span className="font-medium">Dispatch</span>
                         </div>
                       </div>
                     </div>
@@ -456,14 +473,103 @@ export default function WebsterPacksPage() {
                               </SelectContent>
                             </Select>
                           </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="number-of-packs">Number of Packs *</Label>
+                            <Select 
+                              value={formData.numberOfPacks.toString()} 
+                              onValueChange={(value) => setFormData({...formData, numberOfPacks: parseInt(value)})}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">1 Pack</SelectItem>
+                                <SelectItem value="2">2 Packs</SelectItem>
+                                <SelectItem value="3">3 Packs</SelectItem>
+                                <SelectItem value="4">4 Packs</SelectItem>
+                                <SelectItem value="5">5 Packs</SelectItem>
+                                <SelectItem value="6">6 Packs</SelectItem>
+                                <SelectItem value="7">7 Packs</SelectItem>
+                                <SelectItem value="8">8 Packs</SelectItem>
+                                <SelectItem value="9">9 Packs</SelectItem>
+                                <SelectItem value="10">10 Packs</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="member-initials">Member Initials *</Label>
+                            <Input
+                              id="member-initials"
+                              value={formData.memberInitials}
+                              onChange={(e) => setFormData({...formData, memberInitials: e.target.value.toUpperCase()})}
+                              placeholder="Enter your initials"
+                              maxLength={5}
+                              required
+                            />
+                          </div>
                         </div>
+
+                        {/* Webster Pack Check Status */}
+                        {formData.websterPackId.trim() && (
+                          <div className="space-y-2">
+                            <Label>Webster Pack Check Status</Label>
+                            {websterPackCheck ? (
+                              <div className={`p-3 rounded-lg border ${
+                                websterPackCheck.canScanOut 
+                                  ? "bg-green-50 border-green-200" 
+                                  : "bg-red-50 border-red-200"
+                              }`}>
+                                <div className="flex items-center gap-2">
+                                  {websterPackCheck.canScanOut ? (
+                                    <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                  ) : (
+                                    <XCircle className="h-5 w-5 text-red-600" />
+                                  )}
+                                  <span className={`font-medium ${
+                                    websterPackCheck.canScanOut ? "text-green-800" : "text-red-800"
+                                  }`}>
+                                    {websterPackCheck.message}
+                                  </span>
+                                </div>
+                                {websterPackCheck.checkDetails && (
+                                  <div className="mt-2 text-sm text-gray-600">
+                                    <p>Status: <span className="font-medium">{websterPackCheck.checkDetails.checkStatus}</span></p>
+                                    <p>Patient: <span className="font-medium">{websterPackCheck.checkDetails.patientName}</span></p>
+                                    <p>Checked: <span className="font-medium">{new Date(websterPackCheck.checkDetails.checkedAt).toLocaleString()}</span></p>
+                                    {websterPackCheck.checkDetails.notes && (
+                                      <p>Notes: <span className="font-medium">{websterPackCheck.checkDetails.notes}</span></p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-5 w-5 text-gray-500" />
+                                  <span className="text-gray-600">
+                                    {formData.websterPackId.trim() ? "Checking pack status..." : "Enter Webster Pack ID to check status"}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* Next Button */}
                         <div className="flex justify-end pt-4">
                           <Button 
                             type="button"
                             onClick={() => setCurrentStep(2)}
-                            disabled={!selectedPatient || !formData.websterPackId.trim()}
+                            disabled={
+                              !selectedPatient || 
+                              !formData.websterPackId.trim() || 
+                              !formData.memberInitials.trim() ||
+                              formData.numberOfPacks < 1 ||
+                              !websterPackCheck ||
+                              !websterPackCheck.canScanOut
+                            }
                             className="min-w-32"
                           >
                             Next Step
@@ -472,150 +578,86 @@ export default function WebsterPacksPage() {
                       </div>
                     )}
 
-                    {/* Step 2: Medication Verification */}
+                    {/* Step 2: Delivery Details */}
                     {currentStep === 2 && selectedPatient && (
                       <div className="space-y-6">
                         <div className="bg-blue-50 p-4 rounded-lg">
-                          <h3 className="font-medium text-blue-900 mb-2">Medication Schedule Verification</h3>
+                          <h3 className="font-medium text-blue-900 mb-2">Delivery Configuration</h3>
                           <p className="text-sm text-blue-700">
-                            Please verify the medications below match what&apos;s in the Webster pack for{" "}
+                            Configure how the Webster pack will be delivered to{" "}
                             <strong>{selectedPatient.name}</strong>
                           </p>
                         </div>
 
-                        {patientMedications && (
-                          <div className="space-y-4">
-                            {/* Medications Grid - Side by Side */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                              {/* Morning Medications */}
-                              <div className="border rounded-lg p-4 h-fit">
-                                <h4 className="font-medium text-yellow-600 mb-3 flex items-center gap-2">
-                                  <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                                  <span className="text-sm">Morning</span>
-                                </h4>
-                                <div className="text-xs text-gray-500 mb-2">
-                                  {patientMedications.medicationsByTime.morning.length} medications
+                        {/* Delivery Method */}
+                        <div className="space-y-2">
+                          <Label htmlFor="delivery-method">Delivery Method</Label>
+                          <Select 
+                            value={formData.deliveryMethod} 
+                            onValueChange={(value) => setFormData({...formData, deliveryMethod: value as "pickup" | "delivery" | "courier"})}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pickup">
+                                <div className="flex items-center gap-2">
+                                  <Package className="h-4 w-4" />
+                                  In-store Pickup
                                 </div>
-                                <div className="space-y-2">
-                                  {patientMedications.medicationsByTime.morning.length > 0 ? (
-                                    patientMedications.medicationsByTime.morning.map((med, index) => (
-                                      <div key={index} className="p-2 bg-yellow-50 rounded text-sm">
-                                        <div className="font-medium text-gray-900">{med.medicationName}</div>
-                                        <div className="text-yellow-700 font-medium">{med.dose}</div>
-                                        {med.strength && (
-                                          <div className="text-xs text-gray-500">{med.strength}</div>
-                                        )}
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div className="text-xs text-gray-400 italic">No morning medications</div>
-                                  )}
+                              </SelectItem>
+                              <SelectItem value="delivery">
+                                <div className="flex items-center gap-2">
+                                  <Truck className="h-4 w-4" />
+                                  Home Delivery
                                 </div>
-                              </div>
+                              </SelectItem>
+                              <SelectItem value="courier">
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="h-4 w-4" />
+                                  Courier Service
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
 
-                              {/* Afternoon Medications */}
-                              <div className="border rounded-lg p-4 h-fit">
-                                <h4 className="font-medium text-orange-600 mb-3 flex items-center gap-2">
-                                  <div className="w-3 h-3 bg-orange-400 rounded-full"></div>
-                                  <span className="text-sm">Afternoon</span>
-                                </h4>
-                                <div className="text-xs text-gray-500 mb-2">
-                                  {patientMedications.medicationsByTime.afternoon.length} medications
-                                </div>
-                                <div className="space-y-2">
-                                  {patientMedications.medicationsByTime.afternoon.length > 0 ? (
-                                    patientMedications.medicationsByTime.afternoon.map((med, index) => (
-                                      <div key={index} className="p-2 bg-orange-50 rounded text-sm">
-                                        <div className="font-medium text-gray-900">{med.medicationName}</div>
-                                        <div className="text-orange-700 font-medium">{med.dose}</div>
-                                        {med.strength && (
-                                          <div className="text-xs text-gray-500">{med.strength}</div>
-                                        )}
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div className="text-xs text-gray-400 italic">No afternoon medications</div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Evening Medications */}
-                              <div className="border rounded-lg p-4 h-fit">
-                                <h4 className="font-medium text-purple-600 mb-3 flex items-center gap-2">
-                                  <div className="w-3 h-3 bg-purple-400 rounded-full"></div>
-                                  <span className="text-sm">Evening</span>
-                                </h4>
-                                <div className="text-xs text-gray-500 mb-2">
-                                  {patientMedications.medicationsByTime.evening.length} medications
-                                </div>
-                                <div className="space-y-2">
-                                  {patientMedications.medicationsByTime.evening.length > 0 ? (
-                                    patientMedications.medicationsByTime.evening.map((med, index) => (
-                                      <div key={index} className="p-2 bg-purple-50 rounded text-sm">
-                                        <div className="font-medium text-gray-900">{med.medicationName}</div>
-                                        <div className="text-purple-700 font-medium">{med.dose}</div>
-                                        {med.strength && (
-                                          <div className="text-xs text-gray-500">{med.strength}</div>
-                                        )}
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div className="text-xs text-gray-400 italic">No evening medications</div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Night Medications */}
-                              <div className="border rounded-lg p-4 h-fit">
-                                <h4 className="font-medium text-indigo-600 mb-3 flex items-center gap-2">
-                                  <div className="w-3 h-3 bg-indigo-400 rounded-full"></div>
-                                  <span className="text-sm">Night</span>
-                                </h4>
-                                <div className="text-xs text-gray-500 mb-2">
-                                  {patientMedications.medicationsByTime.night.length} medications
-                                </div>
-                                <div className="space-y-2">
-                                  {patientMedications.medicationsByTime.night.length > 0 ? (
-                                    patientMedications.medicationsByTime.night.map((med, index) => (
-                                      <div key={index} className="p-2 bg-indigo-50 rounded text-sm">
-                                        <div className="font-medium text-gray-900">{med.medicationName}</div>
-                                        <div className="text-indigo-700 font-medium">{med.dose}</div>
-                                        {med.strength && (
-                                          <div className="text-xs text-gray-500">{med.strength}</div>
-                                        )}
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div className="text-xs text-gray-400 italic">No night medications</div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Summary */}
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                              <h4 className="font-medium mb-2">Medication Summary</h4>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                  <div className="font-medium">Total Medications</div>
-                                  <div className="text-2xl font-bold text-blue-600">{patientMedications.totalMedications}</div>
-                                </div>
-                                <div>
-                                  <div className="font-medium">Total Doses</div>
-                                  <div className="text-2xl font-bold text-green-600">{patientMedications.totalDoses}</div>
-                                </div>
-                                <div>
-                                  <div className="font-medium">Pack Type</div>
-                                  <div className="text-lg font-medium capitalize">{formData.packType}</div>
-                                </div>
-                                <div>
-                                  <div className="font-medium">Pack ID</div>
-                                  <div className="text-lg font-medium">{formData.websterPackId}</div>
-                                </div>
-                              </div>
-                            </div>
+                        {/* Delivery Address (if not pickup) */}
+                        {formData.deliveryMethod !== "pickup" && (
+                          <div className="space-y-2">
+                            <Label htmlFor="delivery-address">Delivery Address</Label>
+                            <Textarea
+                              id="delivery-address"
+                              value={formData.deliveryAddress}
+                              onChange={(e) => setFormData({...formData, deliveryAddress: e.target.value})}
+                              placeholder="Enter delivery address..."
+                              rows={3}
+                            />
                           </div>
                         )}
+
+                        {/* Recipient Name */}
+                        <div className="space-y-2">
+                          <Label htmlFor="recipient-name">Recipient Name</Label>
+                          <Input
+                            id="recipient-name"
+                            value={formData.recipientName}
+                            onChange={(e) => setFormData({...formData, recipientName: e.target.value})}
+                            placeholder="Who will receive the pack?"
+                          />
+                        </div>
+
+                        {/* Delivery Notes */}
+                        <div className="space-y-2">
+                          <Label htmlFor="delivery-notes">Delivery Notes</Label>
+                          <Textarea
+                            id="delivery-notes"
+                            value={formData.deliveryNotes}
+                            onChange={(e) => setFormData({...formData, deliveryNotes: e.target.value})}
+                            placeholder="Special instructions for delivery..."
+                            rows={2}
+                          />
+                        </div>
 
                         {/* Navigation Buttons */}
                         <div className="flex justify-between pt-4">
@@ -629,49 +671,90 @@ export default function WebsterPacksPage() {
                           </Button>
                           <Button 
                             type="button"
-                            onClick={() => {
-                              setFormData({...formData, medicationVerified: true});
-                              setCurrentStep(3);
-                            }}
+                            onClick={() => setCurrentStep(3)}
                             className="min-w-32"
                           >
-                            Medications Verified
+                            Next Step
                           </Button>
                         </div>
                       </div>
                     )}
 
-                    {/* Step 3: Final Check */}
+                    {/* Step 3: Final Confirmation */}
                     {currentStep === 3 && selectedPatient && (
                       <div className="space-y-6">
                         <div className="bg-green-50 p-4 rounded-lg">
-                          <h3 className="font-medium text-green-900 mb-2">Final Pack Verification</h3>
+                          <h3 className="font-medium text-green-900 mb-2">Dispatch Confirmation</h3>
                           <p className="text-sm text-green-700">
-                            Complete the quality check for Webster pack <strong>{formData.websterPackId}</strong>
+                            Ready to dispatch Webster pack <strong>{formData.websterPackId}</strong> to{" "}
+                            <strong>{selectedPatient.name}</strong>
                           </p>
                         </div>
 
-                        {/* Check Status */}
+                        {/* Dispatch Summary */}
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <h4 className="font-medium mb-3">Dispatch Summary</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <div className="font-medium">Patient</div>
+                              <div className="text-gray-600">{selectedPatient.name}</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">Pack ID</div>
+                              <div className="text-gray-600">{formData.websterPackId}</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">Pack Type</div>
+                              <div className="text-gray-600 capitalize">{formData.packType}</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">Number of Packs</div>
+                              <div className="text-gray-600">{formData.numberOfPacks}</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">Member Initials</div>
+                              <div className="text-gray-600">{formData.memberInitials}</div>
+                            </div>
+                            <div>
+                              <div className="font-medium">Delivery Method</div>
+                              <div className="text-gray-600 capitalize">{formData.deliveryMethod.replace("_", " ")}</div>
+                            </div>
+                            {formData.deliveryMethod !== "pickup" && formData.deliveryAddress && (
+                              <div className="col-span-2">
+                                <div className="font-medium">Delivery Address</div>
+                                <div className="text-gray-600">{formData.deliveryAddress}</div>
+                              </div>
+                            )}
+                            {formData.recipientName && (
+                              <div className="col-span-2">
+                                <div className="font-medium">Recipient</div>
+                                <div className="text-gray-600">{formData.recipientName}</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Scan Out Status */}
                         <div className="space-y-2">
-                          <Label htmlFor="check-status">Check Status</Label>
+                          <Label htmlFor="scan-out-status">Scan Out Status</Label>
                           <Select 
-                            value={formData.checkStatus} 
-                            onValueChange={(value) => setFormData({...formData, checkStatus: value as "passed" | "failed" | "requires_review"})}
+                            value={formData.scanOutStatus} 
+                            onValueChange={(value) => setFormData({...formData, scanOutStatus: value as "dispatched" | "collected" | "failed"})}
                           >
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="passed">
+                              <SelectItem value="dispatched">
                                 <div className="flex items-center gap-2">
-                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                  Passed
+                                  <Truck className="h-4 w-4 text-blue-600" />
+                                  Dispatched
                                 </div>
                               </SelectItem>
-                              <SelectItem value="requires_review">
+                              <SelectItem value="collected">
                                 <div className="flex items-center gap-2">
-                                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                                  Requires Review
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                  Collected
                                 </div>
                               </SelectItem>
                               <SelectItem value="failed">
@@ -684,86 +767,6 @@ export default function WebsterPacksPage() {
                           </Select>
                         </div>
 
-                        {/* Issues */}
-                        {(formData.checkStatus === "failed" || formData.checkStatus === "requires_review") && (
-                          <div className="space-y-2">
-                            <Label>Issues Identified</Label>
-                            <div className="flex gap-2">
-                              <Input
-                                value={newIssue}
-                                onChange={(e) => setNewIssue(e.target.value)}
-                                placeholder="Describe an issue..."
-                                onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddIssue())}
-                              />
-                              <Button type="button" onClick={handleAddIssue} variant="outline">
-                                Add
-                              </Button>
-                            </div>
-                            {formData.issues.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-2">
-                                {formData.issues.map((issue: string, index: number) => (
-                                  <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                                    {issue}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveIssue(index)}
-                                      className="ml-1 text-xs hover:text-red-600"
-                                    >
-                                      ×
-                                    </button>
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Additional Details */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="medication-count">Medication Count</Label>
-                            <Input
-                              id="medication-count"
-                              type="number"
-                              value={formData.medicationCount}
-                              onChange={(e) => setFormData({...formData, medicationCount: e.target.value})}
-                              placeholder="0"
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="pack-weight">Pack Weight (g)</Label>
-                            <Input
-                              id="pack-weight"
-                              type="number"
-                              step="0.1"
-                              value={formData.packWeight}
-                              onChange={(e) => setFormData({...formData, packWeight: e.target.value})}
-                              placeholder="0.0"
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="batch-number">Batch Number</Label>
-                            <Input
-                              id="batch-number"
-                              value={formData.batchNumber}
-                              onChange={(e) => setFormData({...formData, batchNumber: e.target.value})}
-                              placeholder="Batch #"
-                            />
-                          </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="expiry-date">Earliest Expiry</Label>
-                            <Input
-                              id="expiry-date"
-                              type="date"
-                              value={formData.expiryDate}
-                              onChange={(e) => setFormData({...formData, expiryDate: e.target.value})}
-                            />
-                          </div>
-                        </div>
-
                         {/* Notes */}
                         <div className="space-y-2">
                           <Label htmlFor="notes">Notes</Label>
@@ -771,7 +774,7 @@ export default function WebsterPacksPage() {
                             id="notes"
                             value={formData.notes}
                             onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                            placeholder="Additional notes about the pack check..."
+                            placeholder="Additional notes about the scan out..."
                             rows={3}
                           />
                         </div>
@@ -795,12 +798,12 @@ export default function WebsterPacksPage() {
                             {isSubmitting ? (
                               <>
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                Recording...
+                                Processing...
                               </>
                             ) : (
                               <>
-                                <Save className="h-4 w-4 mr-2" />
-                                Complete Check
+                                <Send className="h-4 w-4 mr-2" />
+                                Complete Scan Out
                               </>
                             )}
                           </Button>
@@ -811,54 +814,52 @@ export default function WebsterPacksPage() {
                 </Card>
               </div>
 
-              {/* Recent Checks */}
+              {/* Recent Scan Outs */}
               <div className="lg:col-span-1">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Clock className="h-5 w-5" />
-                      Recent Checks
+                      Recent Scan Outs
                     </CardTitle>
                     <CardDescription>
-                      Latest Webster pack verification activity
+                      Latest Webster pack dispatch activity
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {recentChecks && recentChecks.length > 0 ? (
+                    {recentScanOuts && recentScanOuts.length > 0 ? (
                       <div className="space-y-4">
-                        {recentChecks.map((check) => (
-                          <div key={check._id} className="border rounded-lg p-3 space-y-2">
+                        {recentScanOuts.map((scanOut) => (
+                          <div key={scanOut._id} className="border rounded-lg p-3 space-y-2">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium text-sm">{check.patientName}</span>
+                              <span className="font-medium text-sm">{scanOut.patientName}</span>
                               <Badge 
                                 variant="outline" 
-                                className={getStatusColor(check.checkStatus)}
+                                className={getStatusColor(scanOut.scanOutStatus)}
                               >
                                 <div className="flex items-center gap-1">
-                                  {getStatusIcon(check.checkStatus)}
-                                  {check.checkStatus.replace("_", " ")}
+                                  {getStatusIcon(scanOut.scanOutStatus)}
+                                  {scanOut.scanOutStatus.replace("_", " ")}
                                 </div>
                               </Badge>
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              Pack: {check.websterPackId} • {check.packType}
+                              Pack: {scanOut.websterPackId} • {scanOut.packType} • {scanOut.numberOfPacks || 1} pack{(scanOut.numberOfPacks || 1) > 1 ? 's' : ''}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {scanOut.deliveryMethod.replace("_", " ")} • {scanOut.recipientName} {scanOut.memberInitials && `• By: ${scanOut.memberInitials}`}
                             </div>
                             <div className="text-xs text-muted-foreground">
-                              Checked by {check.checkerName} • {formatDistanceToNow(new Date(check.checkedAt))} ago
+                              Scanned out by {scanOut.scannerName} • {formatDistanceToNow(new Date(scanOut.scannedOutAt))} ago
                             </div>
-                            {check.issues && check.issues.length > 0 && (
-                              <div className="text-xs text-red-600">
-                                Issues: {check.issues.join(", ")}
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
                     ) : (
                       <div className="text-center py-8 text-muted-foreground">
-                        <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No recent checks</p>
-                        <p className="text-xs">Completed checks will appear here</p>
+                        <PackageOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No recent scan outs</p>
+                        <p className="text-xs">Dispatched packs will appear here</p>
                       </div>
                     )}
                   </CardContent>
