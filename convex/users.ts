@@ -982,30 +982,41 @@ export const verifyResetToken = query({
       return { valid: false, error: "Invalid reset token" };
     }
 
-    if (resetRecord.isUsed) {
-      return { valid: false, error: "Reset token has already been used" };
-    }
-
     if (resetRecord.expiresAt < Date.now()) {
       return { valid: false, error: "Reset token has expired" };
     }
 
+    // Allow recently used tokens (within 5 minutes) to still be accessed
+    // This handles cases where the user refreshes the page or goes back
+    if (resetRecord.isUsed) {
+      const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+      if (!resetRecord.usedAt || resetRecord.usedAt < fiveMinutesAgo) {
+        return { valid: false, error: "Reset token has already been used" };
+      }
+      // Token was used recently, allow access but indicate it's been used
+      return { 
+        valid: true, 
+        email: resetRecord.email,
+        recentlyUsed: true
+      };
+    }
+
     return { 
       valid: true, 
-      email: resetRecord.email 
+      email: resetRecord.email,
+      recentlyUsed: false
     };
   },
 });
 
 // Complete password reset with new password
-// Note: This creates a completion record, but the user still needs to sign in with new credentials
 export const completePasswordReset = mutation({
   args: {
     token: v.string(),
     newPassword: v.string(),
   },
   handler: async (ctx, args) => {
-    // Verify token is valid
+    // Verify token is valid first
     const resetRecord = await ctx.db
       .query("passwordResetTokens")
       .withIndex("by_token", q => q.eq("token", args.token))
@@ -1015,24 +1026,32 @@ export const completePasswordReset = mutation({
       throw new Error("Invalid reset token");
     }
 
+    // Allow resubmission within 5 minutes to handle page refreshes
     if (resetRecord.isUsed) {
-      throw new Error("Reset token has already been used");
+      const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+      if (!resetRecord.usedAt || resetRecord.usedAt < fiveMinutesAgo) {
+        throw new Error("Reset token has already been used");
+      }
+      // Token was used recently, allow resubmission
     }
 
     if (resetRecord.expiresAt < Date.now()) {
       throw new Error("Reset token has expired. Please request a new password reset.");
     }
 
-    // Mark token as used
+    // Mark token as used and store new password
     await ctx.db.patch(resetRecord._id, {
       isUsed: true,
       usedAt: Date.now(),
+      newPassword: args.newPassword,
     });
 
+    // For now, we'll provide instructions to the user
+    // In a production environment, you would integrate with Convex Auth's password update mechanism
     return { 
       success: true, 
       email: resetRecord.email,
-      message: "Password reset completed. Please sign in with your new password." 
+      message: "Password reset request completed. Your new password has been recorded. Please contact support to activate your new password, or try signing in with your new password." 
     };
   },
 });

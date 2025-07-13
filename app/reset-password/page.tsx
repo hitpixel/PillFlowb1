@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { GalleryVerticalEnd, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -113,10 +113,13 @@ export default function ResetPasswordPage() {
         <div className="flex flex-col gap-4 p-6 md:p-10">
           <div className="flex justify-center gap-2 md:justify-start">
             <Link href="/" className="flex items-center gap-2 font-medium">
-              <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
-                <GalleryVerticalEnd className="size-4" />
-              </div>
-              PillFlow
+              <Image
+                src="/pillflowb.png"
+                alt="PillFlow Logo"
+                width={120}
+                height={32}
+                className="rounded-md"
+              />
             </Link>
           </div>
           <div className="flex flex-1 items-center justify-center">
@@ -163,10 +166,13 @@ export default function ResetPasswordPage() {
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
           <Link href="/" className="flex items-center gap-2 font-medium">
-            <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
-              <GalleryVerticalEnd className="size-4" />
-            </div>
-            PillFlow
+            <Image
+              src="/pillflowb.png"
+              alt="PillFlow Logo"
+              width={120}
+              height={32}
+              className="rounded-md"
+            />
           </Link>
         </div>
         <div className="flex flex-1 items-center justify-center">
@@ -177,12 +183,21 @@ export default function ResetPasswordPage() {
                 <h1 className="font-bold text-4xl lg:text-5xl xl:text-6xl text-black mb-2">
                   Set New Password
                 </h1>
-                <p className="text-base lg:text-lg text-black">
-                  {isCompleted 
-                    ? "Password successfully reset!" 
-                    : `Enter a new password for ${verifyResetToken?.email || 'your account'}`
-                  }
-                </p>
+                                 <p className="text-base lg:text-lg text-black">
+                   {isCompleted 
+                     ? "Password successfully reset!" 
+                     : verifyResetToken?.recentlyUsed
+                     ? `This reset link was recently used. You can still update your password for ${verifyResetToken?.email || 'your account'}`
+                     : `Enter a new password for ${verifyResetToken?.email || 'your account'}`
+                   }
+                 </p>
+                 {verifyResetToken?.recentlyUsed && !isCompleted && (
+                   <div className="bg-orange-50 p-3 rounded-md border border-orange-200 text-center">
+                     <p className="text-orange-800 text-sm">
+                       ⚠️ This reset link was already used recently. If you already reset your password, try signing in instead.
+                     </p>
+                   </div>
+                 )}
               </div>
 
               {!isCompleted ? (

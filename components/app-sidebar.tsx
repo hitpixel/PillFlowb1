@@ -211,11 +211,11 @@ const getNavigationData = (organizationType?: "pharmacy" | "gp_clinic" | "hospit
       avatar: "/avatars/user.jpg",
     },
     teams: [
-      {
-        name: "PillFlow Health",
-        logo: GalleryVerticalEnd,
-        plan: "Professional",
-      },
+              {
+          name: "PillFlow Health",
+          logo: GalleryVerticalEnd,
+          plan: "Professional",
+        },
       {
         name: "Regional Clinic",
         logo: Building2,

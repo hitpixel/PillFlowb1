@@ -519,6 +519,7 @@ export default defineSchema({
     isUsed: v.boolean(),
     createdAt: v.float64(),
     usedAt: v.optional(v.float64()),
+    newPassword: v.optional(v.string()), // Temporary storage for new password during reset
   })
     .index("by_token", ["token"])
     .index("by_email", ["email"])

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: "PillFlow",
   description: "Modern medication management app",
   icons: {
-    icon: "/convex.svg",
+    icon: "/pillflow-fav.png",
   },
 };
 

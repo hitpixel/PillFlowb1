@@ -6,7 +6,7 @@ import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 import Image from "next/image";
-import { Building2, GalleryVerticalEnd, Users } from "lucide-react";
+import { Building2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -256,10 +256,13 @@ export default function SetupPage() {
         <div className="flex flex-col gap-4 p-6 md:p-10">
           <div className="flex justify-center gap-2 md:justify-start">
             <Link href="/" className="flex items-center gap-2 font-semibold">
-              <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
-                <GalleryVerticalEnd className="size-4" />
-              </div>
-              PillFlow
+              <Image
+                src="/pillflowb.png"
+                alt="PillFlow Logo"
+                width={120}
+                height={32}
+                className="rounded-md"
+              />
             </Link>
           </div>
           <div className="flex flex-1 items-center justify-center">
@@ -308,10 +311,13 @@ export default function SetupPage() {
         <div className="flex flex-col gap-4 p-6 md:p-10">
           <div className="flex justify-center gap-2 md:justify-start">
             <Link href="/" className="flex items-center gap-2 font-semibold">
-              <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
-                <GalleryVerticalEnd className="size-4" />
-              </div>
-              PillFlow
+              <Image
+                src="/pillflowb.png"
+                alt="PillFlow Logo"
+                width={120}
+                height={32}
+                className="rounded-md"
+              />
             </Link>
           </div>
           <div className="flex flex-1 items-center justify-center">
@@ -370,10 +376,13 @@ export default function SetupPage() {
       <div className="flex flex-col gap-4 p-6 md:p-10">
         <div className="flex justify-center gap-2 md:justify-start">
           <Link href="/" className="flex items-center gap-2 font-medium">
-            <div className="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
-              <GalleryVerticalEnd className="size-4" />
-            </div>
-            PillFlow
+            <Image
+              src="/pillflowb.png"
+              alt="PillFlow Logo"
+              width={120}
+              height={32}
+              className="rounded-md"
+            />
           </Link>
         </div>
         <div className="flex flex-1 items-center justify-center">
