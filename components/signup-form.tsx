@@ -56,27 +56,71 @@ export function SignUpForm({ className }: SignUpFormProps) {
     if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
       const message = error.message.toLowerCase();
       
-      if (message.includes('email already exists') || message.includes('account already exists')) {
-        return "An account with this email already exists. Please try signing in instead.";
+      // Handle account already exists errors
+      if (message.includes('email already exists') || message.includes('account already exists') || message.includes('user already exists')) {
+        return "An account with this email address already exists. Please try signing in instead or use a different email.";
       }
       
+      // Handle password-related errors
       if (message.includes('password')) {
-        if (message.includes('too short')) {
+        if (message.includes('too short') || message.includes('minimum')) {
           return "Password must be at least 8 characters long.";
         }
-        if (message.includes('too weak')) {
-          return "Password is too weak. Please use a stronger password with letters, numbers, and symbols.";
+        if (message.includes('too weak') || message.includes('strength')) {
+          return "Password is too weak. Please use a stronger password with a mix of letters, numbers, and symbols.";
+        }
+        if (message.includes('required') || message.includes('missing')) {
+          return "Password is required. Please enter a password.";
+        }
+        if (message.includes('common') || message.includes('easily guessed')) {
+          return "This password is too common. Please choose a more secure password.";
         }
       }
       
-      if (message.includes('invalid format') || message.includes('invalid email')) {
-        return "Please enter a valid email address.";
+      // Handle email-related errors
+      if (message.includes('invalid format') || message.includes('invalid email') || message.includes('malformed email')) {
+        return "Please enter a valid email address (e.g., john@example.com).";
+      }
+      
+      if (message.includes('email required') || message.includes('missing email')) {
+        return "Email address is required. Please enter your email.";
+      }
+      
+      if (message.includes('disposable email') || message.includes('temporary email')) {
+        return "Temporary or disposable email addresses are not allowed. Please use a permanent email address.";
+      }
+      
+      // Handle name-related errors
+      if (message.includes('first name') || message.includes('given name')) {
+        return "First name is required. Please enter your first name.";
+      }
+      
+      if (message.includes('last name') || message.includes('surname') || message.includes('family name')) {
+        return "Last name is required. Please enter your last name.";
+      }
+      
+      // Handle network and server errors
+      if (message.includes('network') || message.includes('connection') || message.includes('timeout')) {
+        return "Network error. Please check your internet connection and try again.";
+      }
+      
+      if (message.includes('server error') || message.includes('internal error')) {
+        return "Server error. Please try again in a few moments.";
+      }
+      
+      if (message.includes('rate limit') || message.includes('too many requests')) {
+        return "Too many sign-up attempts. Please wait a few minutes before trying again.";
+      }
+      
+      // Handle terms and conditions
+      if (message.includes('terms') || message.includes('conditions')) {
+        return "You must accept the terms and conditions to create an account.";
       }
       
       return error.message as string;
     }
     
-    return "Failed to create account. Please check your information and try again.";
+    return "Unable to create account. Please check all required fields and try again.";
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

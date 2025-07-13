@@ -43,18 +43,47 @@ export function SignInForm({ className }: SignInFormProps) {
     if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
       const message = error.message.toLowerCase();
       
-      if (message.includes('invalid credentials') || message.includes('invalid email or password')) {
-        return "Invalid email or password. Please check your credentials and try again.";
+      // Handle specific authentication errors
+      if (message.includes('invalid credentials') || message.includes('invalid email or password') || message.includes('wrong password')) {
+        return "Incorrect email or password. Please check your credentials and try again.";
       }
       
-      if (message.includes('invalid format') || message.includes('invalid email')) {
+      if (message.includes('user not found') || message.includes('account not found') || message.includes('no user found')) {
+        return "No account found with this email address. Please check your email or sign up for a new account.";
+      }
+      
+      if (message.includes('account disabled') || message.includes('account locked') || message.includes('account suspended')) {
+        return "This account has been disabled. Please contact support for assistance.";
+      }
+      
+      if (message.includes('too many attempts') || message.includes('rate limit') || message.includes('temporarily locked')) {
+        return "Too many failed sign-in attempts. Please wait a few minutes before trying again.";
+      }
+      
+      if (message.includes('email not verified') || message.includes('verify email')) {
+        return "Please verify your email address before signing in. Check your inbox for a verification link.";
+      }
+      
+      if (message.includes('invalid format') || message.includes('invalid email') || message.includes('malformed email')) {
         return "Please enter a valid email address.";
+      }
+      
+      if (message.includes('password required') || message.includes('missing password')) {
+        return "Password is required. Please enter your password.";
+      }
+      
+      if (message.includes('network') || message.includes('connection') || message.includes('timeout')) {
+        return "Connection error. Please check your internet connection and try again.";
+      }
+      
+      if (message.includes('server error') || message.includes('internal error')) {
+        return "Server error. Please try again in a few moments.";
       }
       
       return error.message as string;
     }
     
-    return "Failed to sign in. Please check your credentials and try again.";
+    return "Sign-in failed. Please check your email and password, then try again.";
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -168,9 +197,19 @@ export function SignInForm({ className }: SignInFormProps) {
               )}
             </button>
           </div>
-                 </div>
+          {/* Forgot Password Link */}
+          <div className="text-right">
+            <a 
+              href="/forgot-password"
+              className="text-sm underline hover:no-underline"
+              style={{ color: '#000000' }}
+            >
+              Forgot your password?
+            </a>
+          </div>
+        </div>
          
-                  {/* Terms and conditions */}
+        {/* Terms and conditions */}
          <div className="flex items-start space-x-2">
            <Checkbox 
              id="terms"

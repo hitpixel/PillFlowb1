@@ -92,10 +92,13 @@ export default function ScanOutPage() {
     searchTerm.trim() ? { searchTerm: searchTerm.trim(), limit: 10 } : "skip"
   );
 
-  // Check if Webster pack has been checked
+  // Check if Webster pack has been checked and matches the selected customer
   const websterPackCheck = useQuery(
     api.websterPacks.getWebsterPackCheckStatus,
-    formData.websterPackId.trim() ? { websterPackId: formData.websterPackId.trim() } : "skip"
+    formData.websterPackId.trim() && selectedPatient ? { 
+      websterPackId: formData.websterPackId.trim(),
+      patientId: selectedPatient._id
+    } : "skip"
   );
 
   // Check if user has access (pharmacy organizations only)
@@ -136,14 +139,21 @@ export default function ScanOutPage() {
       return;
     }
 
-    // Check if Webster pack has been checked
+    // Check if Webster pack has been checked and matches the selected customer
     if (websterPackCheck && !websterPackCheck.canScanOut) {
       toast.error(websterPackCheck.message);
       return;
     }
 
     if (!websterPackCheck) {
-      toast.error("Please enter a valid Webster Pack ID to check its status");
+      toast.error("Please enter a valid Webster Pack ID and select a customer to check its status");
+      return;
+    }
+
+    // Additional validation: ensure the pack is assigned to the selected customer
+    if (websterPackCheck.checkDetails?.patientId && 
+        websterPackCheck.checkDetails.patientId !== selectedPatient._id) {
+      toast.error(`This Webster pack is assigned to ${websterPackCheck.checkDetails.patientName}, not ${selectedPatient.name}`);
       return;
     }
 
@@ -536,7 +546,12 @@ export default function ScanOutPage() {
                                 {websterPackCheck.checkDetails && (
                                   <div className="mt-2 text-sm text-gray-600">
                                     <p>Status: <span className="font-medium">{websterPackCheck.checkDetails.checkStatus}</span></p>
-                                    <p>Patient: <span className="font-medium">{websterPackCheck.checkDetails.patientName}</span></p>
+                                    <p>Assigned to: <span className="font-medium">{websterPackCheck.checkDetails.patientName}</span></p>
+                                    {selectedPatient && websterPackCheck.checkDetails.patientId !== selectedPatient._id && (
+                                      <p className="text-red-600 font-medium">
+                                        ⚠️ Selected customer: <span className="font-medium">{selectedPatient.name}</span>
+                                      </p>
+                                    )}
                                     <p>Checked: <span className="font-medium">{new Date(websterPackCheck.checkDetails.checkedAt).toLocaleString()}</span></p>
                                     {websterPackCheck.checkDetails.notes && (
                                       <p>Notes: <span className="font-medium">{websterPackCheck.checkDetails.notes}</span></p>
@@ -549,7 +564,9 @@ export default function ScanOutPage() {
                                 <div className="flex items-center gap-2">
                                   <Clock className="h-5 w-5 text-gray-500" />
                                   <span className="text-gray-600">
-                                    {formData.websterPackId.trim() ? "Checking pack status..." : "Enter Webster Pack ID to check status"}
+                                    {formData.websterPackId.trim() && selectedPatient ? "Checking pack status..." : 
+                                     !selectedPatient ? "Select a customer first" :
+                                     "Enter Webster Pack ID to check status"}
                                   </span>
                                 </div>
                               </div>

@@ -511,4 +511,18 @@ export default defineSchema({
     .index("by_scanned_out_at", ["scannedOutAt"])
     .index("by_active", ["isActive"]),
 
+  // Password reset tokens for secure password recovery
+  passwordResetTokens: defineTable({
+    email: v.string(),
+    token: v.string(),
+    expiresAt: v.float64(),
+    isUsed: v.boolean(),
+    createdAt: v.float64(),
+    usedAt: v.optional(v.float64()),
+  })
+    .index("by_token", ["token"])
+    .index("by_email", ["email"])
+    .index("by_expiry", ["expiresAt"])
+    .index("by_used", ["isUsed"]),
+
 });

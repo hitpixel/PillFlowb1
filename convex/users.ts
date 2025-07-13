@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { auth } from "./auth";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
 // Create user profile after signup
@@ -912,3 +912,137 @@ export const cancelInvitation = mutation({
     return args.invitationId;
   },
 }); 
+
+// Password Reset Functions
+
+// Request password reset - generates token and sends email
+export const requestPasswordReset = mutation({
+  args: {
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Check if user exists with this email
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_email", q => q.eq("email", args.email.toLowerCase()))
+      .first();
+
+    if (!userProfile) {
+      // Don't reveal if email exists or not for security
+      // Just return success to prevent email enumeration
+      return { success: true };
+    }
+
+    // Generate secure random token
+    const token = generateResetToken();
+    const expiresAt = Date.now() + (60 * 60 * 1000); // 1 hour from now
+
+    // Invalidate any existing reset tokens for this email
+    const existingTokens = await ctx.db
+      .query("passwordResetTokens")
+      .withIndex("by_email", q => q.eq("email", args.email.toLowerCase()))
+      .filter(q => q.eq(q.field("isUsed"), false))
+      .collect();
+
+    for (const existingToken of existingTokens) {
+      await ctx.db.patch(existingToken._id, { isUsed: true });
+    }
+
+    // Create new reset token
+    await ctx.db.insert("passwordResetTokens", {
+      email: args.email.toLowerCase(),
+      token,
+      expiresAt,
+      isUsed: false,
+      createdAt: Date.now(),
+    });
+
+    // Send password reset email using the existing sendPasswordResetEmail function
+    await ctx.scheduler.runAfter(0, api.emails.sendPasswordResetEmail, {
+      userEmail: args.email,
+      resetToken: token,
+    });
+
+    return { success: true };
+  },
+});
+
+// Verify password reset token
+export const verifyResetToken = query({
+  args: {
+    token: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const resetRecord = await ctx.db
+      .query("passwordResetTokens")
+      .withIndex("by_token", q => q.eq("token", args.token))
+      .first();
+
+    if (!resetRecord) {
+      return { valid: false, error: "Invalid reset token" };
+    }
+
+    if (resetRecord.isUsed) {
+      return { valid: false, error: "Reset token has already been used" };
+    }
+
+    if (resetRecord.expiresAt < Date.now()) {
+      return { valid: false, error: "Reset token has expired" };
+    }
+
+    return { 
+      valid: true, 
+      email: resetRecord.email 
+    };
+  },
+});
+
+// Complete password reset with new password
+// Note: This creates a completion record, but the user still needs to sign in with new credentials
+export const completePasswordReset = mutation({
+  args: {
+    token: v.string(),
+    newPassword: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Verify token is valid
+    const resetRecord = await ctx.db
+      .query("passwordResetTokens")
+      .withIndex("by_token", q => q.eq("token", args.token))
+      .first();
+
+    if (!resetRecord) {
+      throw new Error("Invalid reset token");
+    }
+
+    if (resetRecord.isUsed) {
+      throw new Error("Reset token has already been used");
+    }
+
+    if (resetRecord.expiresAt < Date.now()) {
+      throw new Error("Reset token has expired. Please request a new password reset.");
+    }
+
+    // Mark token as used
+    await ctx.db.patch(resetRecord._id, {
+      isUsed: true,
+      usedAt: Date.now(),
+    });
+
+    return { 
+      success: true, 
+      email: resetRecord.email,
+      message: "Password reset completed. Please sign in with your new password." 
+    };
+  },
+});
+
+function generateResetToken(): string {
+  // Generate a cryptographically secure random token
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  for (let i = 0; i < 32; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+} 

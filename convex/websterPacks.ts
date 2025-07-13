@@ -685,6 +685,60 @@ export const getWebsterScanOutStats = query({
   },
 });
 
+// Get Webster pack scan outs for a patient
+export const getPatientWebsterScanOuts = query({
+  args: {
+    patientId: v.id("patients"),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("User not authenticated");
+    }
+
+    // Get user profile to find organization
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile || !userProfile.organizationId) {
+      throw new Error("User must be part of an organization");
+    }
+
+    // Check if user has access to this patient
+    const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
+    if (!hasAccess) {
+      throw new Error("Access denied: You don't have permission to view scan outs for this patient");
+    }
+
+    // Get scan outs for the patient
+    const scanOuts = await ctx.db
+      .query("websterPackScanOuts")
+      .withIndex("by_patient", (q) => q.eq("patientId", args.patientId))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .order("desc")
+      .take(args.limit || 50);
+
+    // Get scanner details for each scan out
+    const scanOutsWithDetails = await Promise.all(
+      scanOuts.map(async (scanOut) => {
+        const scanner = await ctx.db.get(scanOut.scannedOutBy);
+        const scannerOrg = await ctx.db.get(scanOut.scannedOutByOrg);
+        
+        return {
+          ...scanOut,
+          scannerName: scanner ? `${scanner.firstName} ${scanner.lastName}` : "Unknown User",
+          scannerOrganization: scannerOrg?.name || "Unknown Organization",
+        };
+      })
+    );
+
+    return scanOutsWithDetails;
+  },
+});
+
 // Get recent Webster pack scan outs
 export const getRecentWebsterScanOuts = query({
   args: {
@@ -741,6 +795,7 @@ export const getRecentWebsterScanOuts = query({
 export const getWebsterPackCheckStatus = query({
   args: {
     websterPackId: v.string(),
+    patientId: v.optional(v.id("patients")), // Added optional patientId for validation
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -782,6 +837,23 @@ export const getWebsterPackCheckStatus = query({
       };
     }
 
+    // If patientId is provided, check if it matches the pack's assigned patient
+    if (args.patientId && websterCheck.patientId !== args.patientId) {
+      return {
+        isChecked: true,
+        canScanOut: false,
+        message: `Webster pack is assigned to a different customer: ${websterCheck.patientName}`,
+        checkDetails: {
+          checkStatus: websterCheck.checkStatus,
+          checkedAt: websterCheck.checkedAt,
+          checkedBy: websterCheck.checkedBy,
+          patientName: websterCheck.patientName,
+          notes: websterCheck.notes,
+          patientId: websterCheck.patientId, // Include the correct patient ID
+        },
+      };
+    }
+
     // Check if the pack passed the quality check
     if (websterCheck.checkStatus === "passed") {
       return {
@@ -794,6 +866,7 @@ export const getWebsterPackCheckStatus = query({
           checkedBy: websterCheck.checkedBy,
           patientName: websterCheck.patientName,
           notes: websterCheck.notes,
+          patientId: websterCheck.patientId,
         },
       };
     } else if (websterCheck.checkStatus === "failed") {
@@ -808,6 +881,7 @@ export const getWebsterPackCheckStatus = query({
           patientName: websterCheck.patientName,
           notes: websterCheck.notes,
           issues: websterCheck.issues,
+          patientId: websterCheck.patientId,
         },
       };
     } else {
@@ -822,6 +896,7 @@ export const getWebsterPackCheckStatus = query({
           patientName: websterCheck.patientName,
           notes: websterCheck.notes,
           issues: websterCheck.issues,
+          patientId: websterCheck.patientId,
         },
       };
     }

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, Calendar, Mail, Phone, MapPin, Package, Share2, Building2, Info, Pill, MessageSquare } from "lucide-react";
+import { ArrowLeft, User, Calendar, Mail, Phone, MapPin, Package, Share2, Building2, Info, Pill, MessageSquare, PackageCheck } from "lucide-react";
 import Link from "next/link";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/sidebar";
 import { PatientMedications } from "@/components/ui/patient-medications";
 import { PatientComments } from "@/components/ui/patient-comments";
+import { PatientWebsterPacks } from "@/components/ui/patient-webster-packs";
 
 export default function SharedPatientPage() {
   const params = useParams();
@@ -220,7 +221,7 @@ export default function SharedPatientPage() {
 
             {/* Patient Information Tabs */}
             <Tabs defaultValue="patient-info" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="patient-info" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
                   Patient Info
@@ -228,6 +229,10 @@ export default function SharedPatientPage() {
                 <TabsTrigger value="medications" className="flex items-center gap-2">
                   <Pill className="h-4 w-4" />
                   Medications
+                </TabsTrigger>
+                <TabsTrigger value="webster-packs" className="flex items-center gap-2">
+                  <PackageCheck className="h-4 w-4" />
+                  Webster Packs
                 </TabsTrigger>
                 <TabsTrigger value="communication" className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
@@ -346,6 +351,11 @@ export default function SharedPatientPage() {
               {/* Medications Tab */}
               <TabsContent value="medications" className="space-y-4">
                 <PatientMedications patientId={patient._id} />
+              </TabsContent>
+
+              {/* Webster Packs Tab */}
+              <TabsContent value="webster-packs" className="space-y-4">
+                <PatientWebsterPacks patientId={patient._id} />
               </TabsContent>
 
               {/* Communication Tab */}
