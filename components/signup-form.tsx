@@ -50,75 +50,118 @@ export function SignUpForm({ className }: SignUpFormProps) {
   }, [password, confirmPassword]);
 
   const getErrorMessage = (error: unknown): string => {
+    if (error === null || error === undefined) {
+      return "Unable to create account. Please check all required fields and try again.";
+    }
+    
     if (typeof error === 'string') {
       return error;
     }
     
-    if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
-      const message = error.message.toLowerCase();
-      
-      // Handle account already exists errors
-      if (message.includes('email already exists') || message.includes('account already exists') || message.includes('user already exists')) {
-        return "An account with this email address already exists. Please try signing in instead or use a different email.";
+    // Handle TypeError cases like "Cannot read properties of null"
+    if (error instanceof TypeError) {
+      if (error.message.includes('Cannot read properties of null') || error.message.includes('Cannot read property')) {
+        return "Account creation failed. Please check your information and try again.";
       }
-      
-      // Handle password-related errors
-      if (message.includes('password')) {
-        if (message.includes('too short') || message.includes('minimum')) {
-          return "Password must be at least 8 characters long.";
+      return error.message;
+    }
+    
+    if (error && typeof error === 'object') {
+      // Handle case where error might be a Response object
+      if ('status' in error && typeof error.status === 'number') {
+        switch (error.status) {
+          case 409:
+            return "An account with this email address already exists. Please try signing in instead or use a different email.";
+          case 400:
+            return "Please check all required fields and try again.";
+          case 429:
+            return "Too many sign-up attempts. Please wait a few minutes before trying again.";
+          case 500:
+            return "Server error. Please try again in a few moments.";
+          default:
+            return `Account creation failed (Error ${error.status}). Please try again.`;
         }
-        if (message.includes('too weak') || message.includes('strength')) {
-          return "Password is too weak. Please use a stronger password with a mix of letters, numbers, and symbols.";
+      }
+      
+      if ('message' in error && typeof error.message === 'string') {
+        const message = error.message.toLowerCase();
+        
+        // Handle account already exists errors
+        if (message.includes('email already exists') || message.includes('account already exists') || message.includes('user already exists') || message.includes('duplicate email') || message.includes('unique constraint')) {
+          return "An account with this email address already exists. Please try signing in instead or use a different email.";
         }
-        if (message.includes('required') || message.includes('missing')) {
-          return "Password is required. Please enter a password.";
+        
+        // Handle password-related errors
+        if (message.includes('password')) {
+          if (message.includes('too short') || message.includes('minimum') || message.includes('at least') || message.includes('length')) {
+            return "Password must be at least 8 characters long.";
+          }
+          if (message.includes('too weak') || message.includes('strength') || message.includes('complex') || message.includes('secure')) {
+            return "Password is too weak. Please use a stronger password with a mix of letters, numbers, and symbols.";
+          }
+          if (message.includes('required') || message.includes('missing')) {
+            return "Password is required. Please enter a password.";
+          }
+          if (message.includes('common') || message.includes('easily guessed') || message.includes('dictionary') || message.includes('weak')) {
+            return "This password is too common. Please choose a more secure password.";
+          }
         }
-        if (message.includes('common') || message.includes('easily guessed')) {
-          return "This password is too common. Please choose a more secure password.";
+        
+        // Handle email-related errors
+        if (message.includes('invalid format') || message.includes('invalid email') || message.includes('malformed email') || message.includes('email format') || message.includes('email address')) {
+          return "Please enter a valid email address (e.g., john@example.com).";
+        }
+        
+        if (message.includes('email required') || message.includes('missing email')) {
+          return "Email address is required. Please enter your email.";
+        }
+        
+        if (message.includes('disposable email') || message.includes('temporary email') || message.includes('blocked domain') || message.includes('invalid domain')) {
+          return "Temporary or disposable email addresses are not allowed. Please use a permanent email address.";
+        }
+        
+        // Handle name-related errors
+        if (message.includes('first name') || message.includes('given name') || message.includes('first_name') || message.includes('firstname')) {
+          return "First name is required. Please enter your first name.";
+        }
+        
+        if (message.includes('last name') || message.includes('surname') || message.includes('family name') || message.includes('last_name') || message.includes('lastname')) {
+          return "Last name is required. Please enter your last name.";
+        }
+        
+        // Handle network and server errors
+        if (message.includes('network') || message.includes('connection') || message.includes('timeout') || message.includes('offline') || message.includes('fetch') || message.includes('request failed')) {
+          return "Network error. Please check your internet connection and try again.";
+        }
+        
+        if (message.includes('server error') || message.includes('internal error') || message.includes('server unavailable') || message.includes('service unavailable') || message.includes('gateway') || message.includes('bad gateway')) {
+          return "Server error. Please try again in a few moments.";
+        }
+        
+        if (message.includes('rate limit') || message.includes('too many requests') || message.includes('throttled') || message.includes('quota exceeded')) {
+          return "Too many sign-up attempts. Please wait a few minutes before trying again.";
+        }
+        
+        // Handle terms and conditions
+        if (message.includes('terms') || message.includes('conditions') || message.includes('agreement') || message.includes('accept')) {
+          return "You must accept the terms and conditions to create an account.";
+        }
+        
+        return error.message as string;
+      }
+      
+      // Handle case where error might have a statusText property
+      if ('statusText' in error && typeof error.statusText === 'string') {
+        return error.statusText as string;
+      }
+      
+      // Handle case where error might have a response property
+      if ('response' in error && error.response && typeof error.response === 'object') {
+        const response = error.response as any;
+        if (response.status === 409) {
+          return "An account with this email address already exists. Please try signing in instead or use a different email.";
         }
       }
-      
-      // Handle email-related errors
-      if (message.includes('invalid format') || message.includes('invalid email') || message.includes('malformed email')) {
-        return "Please enter a valid email address (e.g., john@example.com).";
-      }
-      
-      if (message.includes('email required') || message.includes('missing email')) {
-        return "Email address is required. Please enter your email.";
-      }
-      
-      if (message.includes('disposable email') || message.includes('temporary email')) {
-        return "Temporary or disposable email addresses are not allowed. Please use a permanent email address.";
-      }
-      
-      // Handle name-related errors
-      if (message.includes('first name') || message.includes('given name')) {
-        return "First name is required. Please enter your first name.";
-      }
-      
-      if (message.includes('last name') || message.includes('surname') || message.includes('family name')) {
-        return "Last name is required. Please enter your last name.";
-      }
-      
-      // Handle network and server errors
-      if (message.includes('network') || message.includes('connection') || message.includes('timeout')) {
-        return "Network error. Please check your internet connection and try again.";
-      }
-      
-      if (message.includes('server error') || message.includes('internal error')) {
-        return "Server error. Please try again in a few moments.";
-      }
-      
-      if (message.includes('rate limit') || message.includes('too many requests')) {
-        return "Too many sign-up attempts. Please wait a few minutes before trying again.";
-      }
-      
-      // Handle terms and conditions
-      if (message.includes('terms') || message.includes('conditions')) {
-        return "You must accept the terms and conditions to create an account.";
-      }
-      
-      return error.message as string;
     }
     
     return "Unable to create account. Please check all required fields and try again.";
@@ -197,6 +240,7 @@ export function SignUpForm({ className }: SignUpFormProps) {
         }
       }
     } catch (error: unknown) {
+      console.error("Sign-up error:", error);
       setError(getErrorMessage(error));
     } finally {
       setIsLoading(false);

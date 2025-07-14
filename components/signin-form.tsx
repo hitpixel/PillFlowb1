@@ -36,51 +36,96 @@ export function SignInForm({ className }: SignInFormProps) {
   }, [searchParams]);
 
   const getErrorMessage = (error: unknown): string => {
+    if (error === null || error === undefined) {
+      return "Sign-in failed. Please check your credentials and try again.";
+    }
+    
     if (typeof error === 'string') {
       return error;
     }
     
-    if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
-      const message = error.message.toLowerCase();
-      
-      // Handle specific authentication errors
-      if (message.includes('invalid credentials') || message.includes('invalid email or password') || message.includes('wrong password')) {
-        return "Incorrect email or password. Please check your credentials and try again.";
+    // Handle TypeError cases like "Cannot read properties of null"
+    if (error instanceof TypeError) {
+      if (error.message.includes('Cannot read properties of null') || error.message.includes('Cannot read property')) {
+        return "Sign-in failed. Please check your email and password, then try again.";
+      }
+      return error.message;
+    }
+    
+    if (error && typeof error === 'object') {
+      // Handle case where error might be a Response object
+      if ('status' in error && typeof error.status === 'number') {
+        switch (error.status) {
+          case 401:
+            return "Incorrect email or password. Please check your credentials and try again.";
+          case 404:
+            return "No account found with this email address. Please check your email or sign up for a new account.";
+          case 429:
+            return "Too many failed sign-in attempts. Please wait a few minutes before trying again.";
+          case 400:
+            return "Invalid request. Please check your email and password format.";
+          case 500:
+            return "Server error. Please try again in a few moments.";
+          default:
+            return `Sign-in failed (Error ${error.status}). Please try again.`;
+        }
       }
       
-      if (message.includes('user not found') || message.includes('account not found') || message.includes('no user found')) {
-        return "No account found with this email address. Please check your email or sign up for a new account.";
+      if ('message' in error && typeof error.message === 'string') {
+        const message = error.message.toLowerCase();
+        
+        // Handle specific authentication errors
+        if (message.includes('invalid credentials') || message.includes('invalid email or password') || message.includes('wrong password') || message.includes('authentication failed') || message.includes('login failed')) {
+          return "Incorrect email or password. Please check your credentials and try again.";
+        }
+        
+        if (message.includes('user not found') || message.includes('account not found') || message.includes('no user found') || message.includes('user does not exist') || message.includes('email not registered')) {
+          return "No account found with this email address. Please check your email or sign up for a new account.";
+        }
+        
+        if (message.includes('account disabled') || message.includes('account locked') || message.includes('account suspended') || message.includes('account blocked') || message.includes('access denied')) {
+          return "This account has been disabled. Please contact support for assistance.";
+        }
+        
+        if (message.includes('too many attempts') || message.includes('rate limit') || message.includes('temporarily locked') || message.includes('too many failed') || message.includes('blocked')) {
+          return "Too many failed sign-in attempts. Please wait a few minutes before trying again.";
+        }
+        
+        if (message.includes('email not verified') || message.includes('verify email') || message.includes('email verification') || message.includes('unverified')) {
+          return "Please verify your email address before signing in. Check your inbox for a verification link.";
+        }
+        
+        if (message.includes('invalid format') || message.includes('invalid email') || message.includes('malformed email') || message.includes('email format')) {
+          return "Please enter a valid email address.";
+        }
+        
+        if (message.includes('password required') || message.includes('missing password') || message.includes('password empty')) {
+          return "Password is required. Please enter your password.";
+        }
+        
+        if (message.includes('network') || message.includes('connection') || message.includes('timeout') || message.includes('offline') || message.includes('fetch')) {
+          return "Connection error. Please check your internet connection and try again.";
+        }
+        
+        if (message.includes('server error') || message.includes('internal error') || message.includes('server unavailable') || message.includes('service unavailable') || message.includes('gateway')) {
+          return "Server error. Please try again in a few moments.";
+        }
+        
+        return error.message as string;
       }
       
-      if (message.includes('account disabled') || message.includes('account locked') || message.includes('account suspended')) {
-        return "This account has been disabled. Please contact support for assistance.";
+      // Handle case where error might have a statusText property
+      if ('statusText' in error && typeof error.statusText === 'string') {
+        return error.statusText as string;
       }
       
-      if (message.includes('too many attempts') || message.includes('rate limit') || message.includes('temporarily locked')) {
-        return "Too many failed sign-in attempts. Please wait a few minutes before trying again.";
+      // Handle case where error might have a response property
+      if ('response' in error && error.response && typeof error.response === 'object') {
+        const response = error.response as any;
+        if (response.status === 401) {
+          return "Incorrect email or password. Please check your credentials and try again.";
+        }
       }
-      
-      if (message.includes('email not verified') || message.includes('verify email')) {
-        return "Please verify your email address before signing in. Check your inbox for a verification link.";
-      }
-      
-      if (message.includes('invalid format') || message.includes('invalid email') || message.includes('malformed email')) {
-        return "Please enter a valid email address.";
-      }
-      
-      if (message.includes('password required') || message.includes('missing password')) {
-        return "Password is required. Please enter your password.";
-      }
-      
-      if (message.includes('network') || message.includes('connection') || message.includes('timeout')) {
-        return "Connection error. Please check your internet connection and try again.";
-      }
-      
-      if (message.includes('server error') || message.includes('internal error')) {
-        return "Server error. Please try again in a few moments.";
-      }
-      
-      return error.message as string;
     }
     
     return "Sign-in failed. Please check your email and password, then try again.";
@@ -125,6 +170,7 @@ export function SignInForm({ className }: SignInFormProps) {
         window.location.href = "/";
       }
     } catch (error: unknown) {
+      console.error("Sign-in error:", error);
       setError(getErrorMessage(error));
     } finally {
       setIsLoading(false);
