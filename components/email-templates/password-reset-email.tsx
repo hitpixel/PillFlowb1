@@ -6,88 +6,141 @@ interface PasswordResetEmailProps {
 
 export function PasswordResetEmail({ resetUrl }: PasswordResetEmailProps) {
   return (
-    <div style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.6', color: '#333' }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
-        <h1 style={{ color: '#0066cc', marginBottom: '20px' }}>
+    <div style={{ 
+      fontFamily: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      lineHeight: '1.6',
+      color: '#000000',
+      backgroundColor: '#ffffff',
+      margin: 0,
+      padding: 0
+    }}>
+      <div style={{
+        maxWidth: '480px',
+        margin: '0 auto',
+        padding: '64px 24px',
+        textAlign: 'center'
+      }}>
+        {/* Logo */}
+        <div style={{ marginBottom: '48px' }}>
+          <img 
+            src="https://pillflow.app/pillflowb.png" 
+            alt="PillFlow" 
+            style={{ 
+              width: '120px', 
+              height: '32px',
+              margin: '0 auto'
+            }} 
+          />
+        </div>
+
+        {/* Title */}
+        <h1 style={{
+          fontSize: '28px',
+          fontWeight: 700,
+          color: '#000000',
+          margin: '0 0 16px 0',
+          letterSpacing: '-0.02em'
+        }}>
           Reset your password
         </h1>
-        
-        <p style={{ marginBottom: '20px' }}>
-          You requested a password reset for your PillFlow account.
+
+        {/* Description */}
+        <p style={{
+          fontSize: '16px',
+          color: '#666666',
+          margin: '0 0 48px 0',
+          lineHeight: '1.5'
+        }}>
+          You requested a password reset for your PillFlow account. Click the button below to create a new password.
         </p>
-        
-        <div style={{ textAlign: 'center', margin: '30px 0' }}>
+
+        {/* CTA Button */}
+        <div style={{ marginBottom: '48px' }}>
           <a 
             href={resetUrl}
-            style={{ 
-              backgroundColor: '#0066cc', 
-              color: 'white', 
-              padding: '12px 24px', 
-              textDecoration: 'none', 
-              borderRadius: '6px', 
+            style={{
               display: 'inline-block',
-              fontWeight: 'bold'
+              backgroundColor: '#000000',
+              color: '#ffffff',
+              fontSize: '16px',
+              fontWeight: 600,
+              padding: '16px 32px',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              letterSpacing: '-0.01em'
             }}
           >
             Reset Password
           </a>
         </div>
-        
-        <div style={{ marginBottom: '20px' }}>
-          <p style={{ marginBottom: '10px', fontWeight: 'bold' }}>
-            Or copy and paste this link into your browser:
-          </p>
-          <div style={{ 
-            backgroundColor: '#f1f5f9', 
-            padding: '10px', 
-            borderRadius: '4px', 
-            border: '1px solid #cbd5e1',
-            wordBreak: 'break-all'
+
+        {/* Alternative link */}
+        <div style={{ marginBottom: '48px' }}>
+          <p style={{
+            fontSize: '14px',
+            color: '#666666',
+            margin: '0 0 16px 0'
           }}>
-            <a 
-              href={resetUrl}
-              style={{ 
-                color: '#0066cc', 
-                textDecoration: 'underline',
-                fontSize: '14px'
-              }}
-            >
+            Or copy and paste this link:
+          </p>
+          <div style={{
+            backgroundColor: '#f5f5f5',
+            padding: '16px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            color: '#000000',
+            wordBreak: 'break-all',
+            fontFamily: 'monospace'
+          }}>
+            <a href={resetUrl} style={{ color: '#000000', textDecoration: 'none' }}>
               {resetUrl}
             </a>
           </div>
         </div>
-        
-        <div style={{ 
-          backgroundColor: '#fef3cd', 
-          border: '1px solid #fbbf24', 
-          borderRadius: '6px', 
-          padding: '15px', 
-          margin: '20px 0' 
+
+        {/* Warning */}
+        <div style={{
+          backgroundColor: '#fff3cd',
+          border: '1px solid #ffeaa7',
+          borderRadius: '8px',
+          padding: '20px',
+          marginBottom: '48px',
+          textAlign: 'left'
         }}>
-          <p style={{ margin: '0', color: '#92400e' }}>
-                         <strong>⏰ Important:</strong> This link will expire in 1 hour. 
-             If you didn&apos;t request this reset, you can safely ignore this email.
+          <p style={{
+            fontSize: '14px',
+            color: '#856404',
+            margin: 0,
+            lineHeight: '1.5'
+          }}>
+            <strong>Important:</strong> This link expires in 1 hour. If you didn't request this reset, you can safely ignore this email.
           </p>
         </div>
-        
-        <p style={{ marginBottom: '20px' }}>
-          Best regards,<br />
-          The PillFlow Team
-        </p>
-        
-        <div style={{ 
-          borderTop: '1px solid #e2e8f0', 
-          paddingTop: '20px', 
-          marginTop: '40px', 
-          fontSize: '14px', 
-          color: '#64748b' 
+
+        {/* Footer */}
+        <div style={{
+          borderTop: '1px solid #e5e5e5',
+          paddingTop: '32px',
+          marginTop: '48px'
         }}>
-          <p style={{ margin: '0' }}>
-                       This email was sent from PillFlow. If you didn&apos;t request a password reset, 
-           please contact our support team.
+          <p style={{
+            fontSize: '14px',
+            color: '#999999',
+            margin: 0,
+            lineHeight: '1.5'
+          }}>
+            Best regards,<br />
+            The PillFlow Team
+          </p>
+          <p style={{
+            fontSize: '12px',
+            color: '#cccccc',
+            margin: '16px 0 0 0'
+          }}>
+            This email was sent from PillFlow
           </p>
         </div>
       </div>
     </div>
   );
-} 
+}

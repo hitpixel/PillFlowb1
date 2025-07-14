@@ -14,133 +14,203 @@ export function OrganizationInviteEmail({
   joinUrl 
 }: OrganizationInviteEmailProps) {
   return (
-    <div style={{ fontFamily: 'Arial, sans-serif', lineHeight: '1.6', color: '#333' }}>
-      <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
-        <h1 style={{ color: '#0066cc', marginBottom: '20px' }}>
-          You&apos;ve been invited to join {organizationName}
-        </h1>
-        
-        <p style={{ marginBottom: '20px' }}>
-          {inviterName} has invited you to join their organization on PillFlow.
-        </p>
-        
-        <p style={{ marginBottom: '20px' }}>
-          PillFlow is a healthcare medication management platform designed for medical professionals.
-        </p>
-        
-        <div style={{ 
-          backgroundColor: '#f8fafc', 
-          border: '1px solid #e2e8f0', 
-          borderRadius: '8px', 
-          padding: '20px', 
-          margin: '20px 0' 
-        }}>
-          <h3 style={{ marginTop: '0', color: '#334155' }}>
-            Getting Started:
-          </h3>
-          <p style={{ marginBottom: '10px' }}>
-                         <strong>If you already have an account:</strong> Sign in and you&apos;ll automatically join the organization.
-           </p>
-           <p style={{ marginBottom: '0' }}>
-             <strong>If you&apos;re new to PillFlow:</strong> Create your account and you&apos;ll be added to the organization immediately.
-          </p>
+    <div style={{ 
+      fontFamily: 'Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      lineHeight: '1.6',
+      color: '#000000',
+      backgroundColor: '#ffffff',
+      margin: 0,
+      padding: 0
+    }}>
+      <div style={{
+        maxWidth: '480px',
+        margin: '0 auto',
+        padding: '64px 24px',
+        textAlign: 'center'
+      }}>
+        {/* Logo */}
+        <div style={{ marginBottom: '48px' }}>
+          <img 
+            src="https://pillflow.app/pillflowb.png" 
+            alt="PillFlow" 
+            style={{ 
+              width: '120px', 
+              height: '32px',
+              margin: '0 auto'
+            }} 
+          />
         </div>
-        
-        <div style={{ textAlign: 'center', margin: '30px 0' }}>
+
+        {/* Title */}
+        <h1 style={{
+          fontSize: '28px',
+          fontWeight: 700,
+          color: '#000000',
+          margin: '0 0 16px 0',
+          letterSpacing: '-0.02em'
+        }}>
+          You're invited to join {organizationName}
+        </h1>
+
+        {/* Description */}
+        <p style={{
+          fontSize: '16px',
+          color: '#666666',
+          margin: '0 0 48px 0',
+          lineHeight: '1.5'
+        }}>
+          {inviterName} has invited you to join their organization on PillFlow, a healthcare medication management platform.
+        </p>
+
+        {/* CTA Button */}
+        <div style={{ marginBottom: '48px' }}>
           <a 
             href={joinUrl}
-            style={{ 
-              backgroundColor: '#0066cc', 
-              color: 'white', 
-              padding: '15px 30px', 
-              textDecoration: 'none', 
-              borderRadius: '8px', 
-              display: 'inline-block', 
-              fontWeight: 'bold' 
+            style={{
+              display: 'inline-block',
+              backgroundColor: '#000000',
+              color: '#ffffff',
+              fontSize: '16px',
+              fontWeight: 600,
+              padding: '16px 32px',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              letterSpacing: '-0.01em'
             }}
           >
-            Accept Invitation & Join {organizationName}
+            Accept Invitation
           </a>
         </div>
-        
-        <div style={{ 
-          backgroundColor: '#f1f5f9', 
-          border: '1px solid #cbd5e1', 
-          borderRadius: '8px', 
-          padding: '15px', 
-          margin: '20px 0' 
+
+        {/* Instructions */}
+        <div style={{
+          backgroundColor: '#f9f9f9',
+          borderRadius: '12px',
+          padding: '40px',
+          marginBottom: '48px',
+          textAlign: 'left'
         }}>
-          <p style={{ margin: '0 0 10px 0', fontWeight: 'bold' }}>
-            Your invitation token:
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: 600,
+            color: '#000000',
+            margin: '0 0 24px 0'
+          }}>
+            How to join
+          </h2>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#000000' }}>Existing users</p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#666666' }}>Sign in and you'll automatically join the organization</p>
+            </div>
+            
+            <div>
+              <p style={{ margin: 0, fontSize: '16px', fontWeight: 600, color: '#000000' }}>New users</p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '14px', color: '#666666' }}>Create your account and you'll be added to the organization immediately</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Invitation Token */}
+        <div style={{
+          backgroundColor: '#f9f9f9',
+          borderRadius: '8px',
+          padding: '24px',
+          marginBottom: '48px',
+          textAlign: 'left'
+        }}>
+          <p style={{
+            fontSize: '14px',
+            fontWeight: 600,
+            color: '#000000',
+            margin: '0 0 8px 0'
+          }}>
+            Your invitation code:
           </p>
-          <code style={{ 
-            backgroundColor: '#e2e8f0', 
-            padding: '8px 12px', 
-            borderRadius: '4px', 
+          <code style={{
             fontFamily: 'monospace',
             fontSize: '14px',
+            color: '#000000',
+            backgroundColor: '#ffffff',
+            padding: '8px 12px',
+            borderRadius: '4px',
+            border: '1px solid #e5e5e5',
             display: 'block',
-            textAlign: 'center'
+            textAlign: 'center',
+            letterSpacing: '0.05em'
           }}>
             {inviteToken}
           </code>
         </div>
-        
-        <div style={{ marginBottom: '20px' }}>
-          <p style={{ marginBottom: '10px', fontWeight: 'bold' }}>
-            Or copy and paste this link into your browser:
-          </p>
-          <div style={{ 
-            backgroundColor: '#f1f5f9', 
-            padding: '10px', 
-            borderRadius: '4px', 
-            border: '1px solid #cbd5e1',
-            wordBreak: 'break-all'
+
+        {/* Alternative link */}
+        <div style={{ marginBottom: '48px' }}>
+          <p style={{
+            fontSize: '14px',
+            color: '#666666',
+            margin: '0 0 16px 0'
           }}>
-            <a 
-              href={joinUrl}
-              style={{ 
-                color: '#0066cc', 
-                textDecoration: 'underline',
-                fontSize: '14px'
-              }}
-            >
+            Or copy and paste this link:
+          </p>
+          <div style={{
+            backgroundColor: '#f5f5f5',
+            padding: '16px',
+            borderRadius: '8px',
+            fontSize: '14px',
+            color: '#000000',
+            wordBreak: 'break-all',
+            fontFamily: 'monospace'
+          }}>
+            <a href={joinUrl} style={{ color: '#000000', textDecoration: 'none' }}>
               {joinUrl}
             </a>
           </div>
         </div>
-        
-        <div style={{ 
-          backgroundColor: '#fef3cd', 
-          border: '1px solid #fbbf24', 
-          borderRadius: '6px', 
-          padding: '15px', 
-          margin: '20px 0' 
+
+        {/* Warning */}
+        <div style={{
+          backgroundColor: '#fff3cd',
+          border: '1px solid #ffeaa7',
+          borderRadius: '8px',
+          padding: '20px',
+          marginBottom: '48px',
+          textAlign: 'left'
         }}>
-          <p style={{ margin: '0', color: '#92400e' }}>
-            <strong>⏰ Important:</strong> This invitation will expire in 7 days. 
-            Please accept it soon to join the team!
+          <p style={{
+            fontSize: '14px',
+            color: '#856404',
+            margin: 0,
+            lineHeight: '1.5'
+          }}>
+            <strong>Important:</strong> This invitation expires in 7 days. Please accept it soon to join the team!
           </p>
         </div>
-        
-        <p style={{ marginBottom: '20px' }}>
-          Best regards,<br />
-          The PillFlow Team
-        </p>
-        
-        <div style={{ 
-          borderTop: '1px solid #e2e8f0', 
-          paddingTop: '20px', 
-          marginTop: '40px', 
-          fontSize: '14px', 
-          color: '#64748b' 
+
+        {/* Footer */}
+        <div style={{
+          borderTop: '1px solid #e5e5e5',
+          paddingTop: '32px',
+          marginTop: '48px'
         }}>
-          <p style={{ margin: '0' }}>
-                       This invitation was sent from PillFlow. If you didn&apos;t expect this invitation, 
-           you can safely ignore this email.
+          <p style={{
+            fontSize: '14px',
+            color: '#999999',
+            margin: 0,
+            lineHeight: '1.5'
+          }}>
+            Best regards,<br />
+            The PillFlow Team
+          </p>
+          <p style={{
+            fontSize: '12px',
+            color: '#cccccc',
+            margin: '16px 0 0 0'
+          }}>
+            This email was sent from PillFlow
           </p>
         </div>
       </div>
     </div>
   );
-} 
+}
