@@ -121,7 +121,7 @@ export function SignInForm({ className }: SignInFormProps) {
       
       // Handle case where error might have a response property
       if ('response' in error && error.response && typeof error.response === 'object') {
-        const response = error.response as any;
+        const response = error.response as { status?: number };
         if (response.status === 401) {
           return "Incorrect email or password. Please check your credentials and try again.";
         }

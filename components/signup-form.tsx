@@ -157,7 +157,7 @@ export function SignUpForm({ className }: SignUpFormProps) {
       
       // Handle case where error might have a response property
       if ('response' in error && error.response && typeof error.response === 'object') {
-        const response = error.response as any;
+        const response = error.response as { status?: number };
         if (response.status === 409) {
           return "An account with this email address already exists. Please try signing in instead or use a different email.";
         }
