@@ -122,7 +122,12 @@ export function ConvexLoginForm({
           
           // If there was an invitation token, user is now part of organization - go to dashboard
           if (inviteToken) {
-            router.push("/dashboard");
+            // Safe router redirect with null check
+            if (router && typeof router.push === 'function') {
+              router.push("/dashboard");
+            } else {
+              window.location.href = "/dashboard";
+            }
             return;
           }
         } catch (profileError) {
@@ -131,13 +136,23 @@ export function ConvexLoginForm({
           // The user authentication succeeded, so let them proceed to setup
         }
         // Always redirect to setup after successful signup (unless invitation was accepted)
-        router.push("/setup");
+        // Safe router redirect with null check
+        if (router && typeof router.push === 'function') {
+          router.push("/setup");
+        } else {
+          window.location.href = "/setup";
+        }
       } else {
         // Sign in - check if there's an invitation token to accept
         if (inviteToken) {
           try {
             await acceptInvitation({ inviteToken });
-            router.push("/dashboard");
+            // Safe router redirect with null check
+            if (router && typeof router.push === 'function') {
+              router.push("/dashboard");
+            } else {
+              window.location.href = "/dashboard";
+            }
             return;
           } catch (inviteError) {
             console.error("Failed to accept invitation:", inviteError);
@@ -145,7 +160,12 @@ export function ConvexLoginForm({
           }
         }
         // Normal sign in - redirect to dashboard
-        router.push("/dashboard");
+        // Safe router redirect with null check
+        if (router && typeof router.push === 'function') {
+          router.push("/dashboard");
+        } else {
+          window.location.href = "/dashboard";
+        }
       }
     } catch (error: unknown) {
       setError(getErrorMessage(error));

@@ -9,7 +9,8 @@ import {
   generateOrganizationInviteEmailHTML,
   generatePasswordResetEmailHTML,
   generateTestEmailHTML,
-  generateTestInvitationEmailHTML
+  generateTestInvitationEmailHTML,
+  generateOTPEmailHTML
 } from "./emailTemplates";
 
 export const resend: Resend = new Resend(components.resend, {
@@ -547,5 +548,51 @@ The PillFlow Team`
       totalFailed: failCount,
       results
     };
+  },
+});
+
+// Send OTP verification email
+export const sendOTPEmail = mutation({
+  args: {
+    userEmail: v.string(),
+    otp: v.string(),
+    userName: v.string(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      console.log("Sending OTP email to:", args.userEmail);
+      
+      // Generate HTML content using template function
+      const htmlContent = generateOTPEmailHTML({
+        userName: args.userName,
+        otp: args.otp,
+      });
+      
+      const emailId = await resend.sendEmail(
+        ctx,
+        "PillFlow Verification <noreply@pillflow.com.au>",
+        args.userEmail,
+        "Your PillFlow Verification Code",
+        htmlContent,
+        `Your PillFlow Verification Code
+
+Hi ${args.userName},
+
+Your verification code is: ${args.otp}
+
+Please enter this code to complete your account setup. This code will expire in 10 minutes.
+
+If you didn't request this code, you can safely ignore this email.
+
+Best regards,
+The PillFlow Team`
+      );
+      
+      console.log("OTP email queued successfully:", emailId);
+      return emailId;
+    } catch (error) {
+      console.error("Failed to send OTP email:", error);
+      throw error;
+    }
   },
 }); 

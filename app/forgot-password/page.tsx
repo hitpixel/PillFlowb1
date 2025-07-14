@@ -6,8 +6,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useAuthActions } from "@convex-dev/auth/react";
 import { cn } from "@/lib/utils";
 
 export default function ForgotPasswordPage() {
@@ -16,7 +15,7 @@ export default function ForgotPasswordPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const requestPasswordReset = useMutation(api.users.requestPasswordReset);
+  const { signIn } = useAuthActions();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -24,13 +23,18 @@ export default function ForgotPasswordPage() {
     setError(null);
 
     try {
-      await requestPasswordReset({ email: email.toLowerCase() });
-      setIsSubmitted(true);
+      const formData = new FormData();
+      formData.append("email", email);
+      formData.append("flow", "reset");
+      
+      await signIn("password", formData);
+      // Redirect to reset password page with email parameter
+      window.location.href = `/reset-password?email=${encodeURIComponent(email)}`;
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
         setError(error.message);
       } else {
-        setError("Failed to send reset email. Please try again.");
+        setError("Failed to send reset code. Please try again.");
       }
     } finally {
       setIsLoading(false);
@@ -71,69 +75,42 @@ export default function ForgotPasswordPage() {
                   Reset Password
                 </h1>
                 <p className="text-base lg:text-lg text-black">
-                  {isSubmitted 
-                    ? "Check your email for reset instructions" 
-                    : "Enter your email address and we'll send you a link to reset your password"
-                  }
+                  Enter your email address and we'll send you a code to reset your password
                 </p>
               </div>
 
-              {!isSubmitted ? (
-                <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="email" className="text-black text-base">
-                      Email Address*
-                    </Label>
-                    <Input 
-                      id="email"
-                      type="email"
-                      placeholder="john.doe@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      disabled={isLoading}
-                      className="text-base border-gray-300 bg-white text-black"
-                    />
-                  </div>
-
-                  {error && (
-                    <div className="text-sm bg-red-50 p-3 rounded-md border border-red-200">
-                      <p className="font-medium text-black">Error:</p>
-                      <p className="text-black">{error}</p>
-                    </div>
-                  )}
-
-                  <Button 
-                    type="submit" 
-                    className="w-full text-white font-bold bg-black hover:bg-gray-800 h-12 text-base"
-                    disabled={isLoading || !email.trim()}
-                  >
-                    {isLoading ? "Sending..." : "Send Reset Link"}
-                  </Button>
-                </form>
-              ) : (
-                <div className="text-center space-y-4">
-                  <div className="bg-green-50 p-4 rounded-md border border-green-200">
-                    <p className="text-green-800 font-medium">✓ Reset link sent!</p>
-                    <p className="text-green-700 text-sm mt-1">
-                      If an account with that email exists, you&apos;ll receive a password reset link shortly.
-                    </p>
-                  </div>
-                  <p className="text-sm text-black">
-                    Didn&apos;t receive the email? Check your spam folder or{" "}
-                    <button
-                      onClick={() => {
-                        setIsSubmitted(false);
-                        setEmail("");
-                        setError(null);
-                      }}
-                      className="underline hover:no-underline text-black font-medium"
-                    >
-                      try again
-                    </button>
-                  </p>
+              <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="email" className="text-black text-base">
+                    Email Address*
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="john.doe@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="text-base border-gray-300 bg-white text-black"
+                  />
                 </div>
-              )}
+
+                {error && (
+                  <div className="text-sm bg-red-50 p-3 rounded-md border border-red-200">
+                    <p className="font-medium text-black">Error:</p>
+                    <p className="text-black">{error}</p>
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full text-white font-bold bg-black hover:bg-gray-800 h-12 text-base"
+                  disabled={isLoading || !email.trim()}
+                >
+                  {isLoading ? "Sending..." : "Send Reset Code"}
+                </Button>
+              </form>
 
               {/* Back to sign in link */}
               <div className="text-center">
@@ -153,4 +130,4 @@ export default function ForgotPasswordPage() {
       </div>
     </div>
   );
-} 
+}

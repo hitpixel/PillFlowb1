@@ -32,6 +32,7 @@ export default function SetupPage() {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const setupStatus = useQuery(api.users.getSetupStatus);
   const userProfile = useQuery(api.users.getCurrentUserProfile);
+  const checkOTPVerification = useQuery(api.users.checkOTPVerification);
   const updateUserProfile = useMutation(api.users.updateUserProfile);
   const createOrganization = useMutation(api.users.createOrganization);
   const acceptInvitation = useMutation(api.users.acceptInvitation);
@@ -63,6 +64,12 @@ export default function SetupPage() {
         return;
       }
       
+      // Check if user needs OTP verification (only for new users who require it, not existing users)
+      if (checkOTPVerification && !checkOTPVerification.isVerified && !checkOTPVerification.isExistingUser && userProfile && !userProfile.organizationId) {
+        router.push("/verify-otp");
+        return;
+      }
+      
       if (setupStatus && !setupStatus.needsSetup) {
         router.push("/");
         return;
@@ -75,7 +82,7 @@ export default function SetupPage() {
         setCurrentStep("choice");
       }
     }
-  }, [isAuthenticated, isLoading, setupStatus, router]);
+  }, [isAuthenticated, isLoading, setupStatus, checkOTPVerification, userProfile, router]);
 
   const getSteps = () => [
     { id: "profile", name: "Profile", description: "Complete your professional details" },

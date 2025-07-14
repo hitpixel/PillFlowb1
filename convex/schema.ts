@@ -35,6 +35,8 @@ export default defineSchema({
     profileCompleted: v.boolean(),
     setupCompleted: v.boolean(),
     welcomeEmailSent: v.optional(v.boolean()),
+    emailVerified: v.optional(v.boolean()), // Legacy field for existing users
+    requiresOTPVerification: v.optional(v.boolean()), // New field - true for new users, false/undefined for existing
     createdAt: v.float64(),
     isActive: v.boolean(),
   })
@@ -525,5 +527,27 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_expiry", ["expiresAt"])
     .index("by_used", ["isUsed"]),
+
+  // OTP verification tokens for signup verification
+  otpVerifications: defineTable({
+    email: v.string(),
+    userId: v.id("users"), // The user who needs to verify
+    otp: v.optional(v.string()), // 6-digit OTP code (new system)
+    code: v.optional(v.string()), // Legacy field name for OTP
+    purpose: v.optional(v.string()), // Legacy field for purpose
+    expiresAt: v.float64(), // Expires in 10 minutes
+    isUsed: v.boolean(),
+    isVerified: v.optional(v.boolean()), // Whether OTP was successfully verified (optional for existing records)
+    createdAt: v.float64(),
+    verifiedAt: v.optional(v.float64()),
+    attempts: v.optional(v.number()), // Number of verification attempts
+  })
+    .index("by_otp", ["otp"])
+    .index("by_code", ["code"]) // Index for legacy field
+    .index("by_email", ["email"])
+    .index("by_user_id", ["userId"])
+    .index("by_expiry", ["expiresAt"])
+    .index("by_used", ["isUsed"])
+    .index("by_verified", ["isVerified"]),
 
 });

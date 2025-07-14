@@ -341,3 +341,69 @@ export function generateTestInvitationEmailHTML({
     </div>
   `;
 } 
+
+export function generateOTPEmailHTML({
+  userName,
+  otp,
+}: {
+  userName: string;
+  otp: string;
+}): string {
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+      <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #0066cc; margin-bottom: 20px;">
+          Email Verification Code
+        </h1>
+        
+        <p style="margin-bottom: 20px;">
+          Hi ${userName || 'there'},
+        </p>
+        
+        <p style="margin-bottom: 20px;">
+          Please use the following verification code to complete your PillFlow account setup:
+        </p>
+        
+        <div style="background-color: #f8fafc; border: 2px solid #0066cc; border-radius: 8px; padding: 30px; margin: 30px 0; text-align: center;">
+          <div style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #0066cc; font-family: 'Courier New', monospace;">
+            ${otp}
+          </div>
+        </div>
+        
+        <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 20px; margin: 20px 0;">
+          <h3 style="margin-top: 0; color: #856404;">
+            ⏰ Important:
+          </h3>
+          <p style="margin: 10px 0;">
+            • This code will expire in <strong>10 minutes</strong>
+          </p>
+          <p style="margin: 10px 0;">
+            • Enter this code exactly as shown (6 digits)
+          </p>
+          <p style="margin: 10px 0;">
+            • If you didn't request this code, you can safely ignore this email
+          </p>
+        </div>
+        
+        <p style="margin-bottom: 20px;">
+          Once verified, you'll be able to complete your account setup and start using PillFlow.
+        </p>
+        
+        <p style="margin-bottom: 20px;">
+          If you're having trouble, you can request a new verification code from the signup page.
+        </p>
+        
+        <p style="margin-bottom: 20px;">
+          Best regards,<br />
+          The PillFlow Team
+        </p>
+        
+        <div style="border-top: 1px solid #e2e8f0; padding-top: 20px; margin-top: 40px; font-size: 14px; color: #64748b;">
+          <p style="margin: 0;">
+            This email was sent from PillFlow, the healthcare medication management platform.
+          </p>
+        </div>
+      </div>
+    </div>
+  `;
+} 

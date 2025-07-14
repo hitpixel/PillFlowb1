@@ -8,11 +8,11 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useAuthActions } from "@convex-dev/auth/react";
 import { cn } from "@/lib/utils";
 
 export default function ResetPasswordPage() {
+  const [code, setCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -24,12 +24,7 @@ export default function ResetPasswordPage() {
   
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get('token');
-  
-  const verifyResetToken = useQuery(api.users.verifyResetToken, 
-    token ? { token } : "skip"
-  );
-  const completePasswordReset = useMutation(api.users.completePasswordReset);
+  const email = searchParams.get('email') || '';
 
   // Check if passwords match whenever they change
   useEffect(() => {
@@ -39,13 +34,6 @@ export default function ResetPasswordPage() {
       setPasswordsMatch(newPassword === confirmPassword);
     }
   }, [newPassword, confirmPassword]);
-
-  // Redirect if no token provided
-  useEffect(() => {
-    if (!token) {
-      router.push('/signin');
-    }
-  }, [token, router]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -64,18 +52,26 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (!token) {
-      setError("Invalid reset token. Please request a new password reset.");
+    if (!email) {
+      setError("Email is required. Please go back to forgot password and request a new code.");
       setIsLoading(false);
       return;
     }
 
     try {
-      await completePasswordReset({ 
-        token, 
-        newPassword 
-      });
+      const formData = new FormData();
+      formData.append("email", email);
+      formData.append("code", code);
+      formData.append("newPassword", newPassword);
+      formData.append("flow", "reset-verification");
+      
+      await signIn("password", formData);
       setIsCompleted(true);
+      
+      // Redirect to signin after 2 seconds
+      setTimeout(() => {
+        router.push('/signin');
+      }, 2000);
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
         setError(error.message);
@@ -87,19 +83,9 @@ export default function ResetPasswordPage() {
     }
   };
 
-  // Show loading while verifying token
-  if (!token || verifyResetToken === undefined) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <p className="text-base text-black">Verifying reset link...</p>
-        </div>
-      </div>
-    );
-  }
+  const { signIn } = useAuthActions();
 
-  // Show error if token is invalid
-  if (verifyResetToken && !verifyResetToken.valid) {
+  if (!email) {
     return (
       <div className="grid min-h-screen lg:grid-cols-2">
         <div className="relative hidden lg:flex">
@@ -124,25 +110,18 @@ export default function ResetPasswordPage() {
           </div>
           <div className="flex flex-1 items-center justify-center">
             <div className="w-full max-w-md text-center space-y-4">
-              <h1 className="font-bold text-4xl text-black">Invalid Link</h1>
+              <h1 className="font-bold text-4xl text-black">Invalid Request</h1>
               <div className="bg-red-50 p-4 rounded-md border border-red-200">
-                <p className="text-red-800 font-medium">✗ Reset link is invalid or expired</p>
+                <p className="text-red-800 font-medium">✗ Email not provided</p>
                 <p className="text-red-700 text-sm mt-1">
-                  {verifyResetToken.error || "This password reset link is no longer valid."}
+                  Please go back to forgot password and request a new reset code.
                 </p>
               </div>
-              <div className="space-y-2">
-                <Link href="/forgot-password">
-                  <Button className="w-full bg-black hover:bg-gray-800 text-white">
-                    Request New Reset Link
-                  </Button>
-                </Link>
-                <Link href="/signin" className="block">
-                  <Button variant="outline" className="w-full">
-                    Back to Sign In
-                  </Button>
-                </Link>
-              </div>
+              <Link href="/forgot-password">
+                <Button className="w-full bg-black hover:bg-gray-800 text-white">
+                  Request New Reset Code
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -183,25 +162,34 @@ export default function ResetPasswordPage() {
                 <h1 className="font-bold text-4xl lg:text-5xl xl:text-6xl text-black mb-2">
                   Set New Password
                 </h1>
-                                 <p className="text-base lg:text-lg text-black">
-                   {isCompleted 
-                     ? "Password successfully reset!" 
-                     : verifyResetToken?.recentlyUsed
-                     ? `This reset link was recently used. You can still update your password for ${verifyResetToken?.email || 'your account'}`
-                     : `Enter a new password for ${verifyResetToken?.email || 'your account'}`
-                   }
-                 </p>
-                 {verifyResetToken?.recentlyUsed && !isCompleted && (
-                   <div className="bg-orange-50 p-3 rounded-md border border-orange-200 text-center">
-                     <p className="text-orange-800 text-sm">
-                       ⚠️ This reset link was already used recently. If you already reset your password, try signing in instead.
-                     </p>
-                   </div>
-                 )}
+                <p className="text-base lg:text-lg text-black">
+                  {isCompleted 
+                    ? "Password successfully reset!" 
+                    : `Enter the reset code sent to ${email} and create a new password`
+                  }
+                </p>
               </div>
 
               {!isCompleted ? (
                 <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+                  {/* Reset Code */}
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="code" className="text-black text-base">
+                      Reset Code*
+                    </Label>
+                    <Input 
+                      id="code"
+                      type="text"
+                      placeholder="Enter 8-digit code"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      required
+                      maxLength={8}
+                      disabled={isLoading}
+                      className="text-base border-gray-300 bg-white text-black"
+                    />
+                  </div>
+
                   {/* New Password */}
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="newPassword" className="text-black text-base">
@@ -271,7 +259,7 @@ export default function ResetPasswordPage() {
                   <Button 
                     type="submit" 
                     className="w-full text-white font-bold bg-black hover:bg-gray-800 h-12 text-base"
-                    disabled={isLoading || !newPassword.trim() || !passwordsMatch || newPassword.length < 8}
+                    disabled={isLoading || !code.trim() || !newPassword.trim() || !passwordsMatch || newPassword.length < 8}
                   >
                     {isLoading ? "Updating..." : "Update Password"}
                   </Button>
@@ -279,9 +267,9 @@ export default function ResetPasswordPage() {
               ) : (
                 <div className="text-center space-y-4">
                   <div className="bg-green-50 p-4 rounded-md border border-green-200">
-                    <p className="text-green-800 font-medium">✓ Password updated successfully!</p>
+                    <p className="text-green-800 font-medium">✓ Password reset completed!</p>
                     <p className="text-green-700 text-sm mt-1">
-                      You can now sign in with your new password.
+                      Your password has been successfully reset. Redirecting to sign in...
                     </p>
                   </div>
                   <Link href="/signin">
@@ -312,4 +300,4 @@ export default function ResetPasswordPage() {
       </div>
     </div>
   );
-} 
+}

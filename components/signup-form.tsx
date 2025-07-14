@@ -19,6 +19,7 @@ interface SignUpFormProps {
 export function SignUpForm({ className }: SignUpFormProps) {
   const { signIn } = useAuthActions();
   const createUserProfile = useMutation(api.users.createUserProfile);
+  const generateSignupOTP = useMutation(api.users.generateSignupOTP);
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -155,14 +156,46 @@ export function SignUpForm({ className }: SignUpFormProps) {
         });
         
         if (inviteToken) {
-          router.push("/");
+          // Users with invite tokens skip OTP verification
+          // Safe router redirect with null check
+          if (router && typeof router.push === 'function') {
+            router.push("/");
+          } else {
+            window.location.href = "/";
+          }
           return;
+        }
+        
+        // Generate OTP for email verification (only for new users who require it)
+        try {
+          await generateSignupOTP({
+            email: formData.get("email") as string,
+          });
+          
+          // Redirect to OTP verification for new users who need verification
+          if (router && typeof router.push === 'function') {
+            router.push("/verify-otp");
+          } else {
+            window.location.href = "/verify-otp";
+          }
+        } catch (otpError) {
+          // If OTP generation fails (e.g., for existing users), redirect to setup
+          console.log("OTP not required or failed, redirecting to setup:", otpError);
+          if (router && typeof router.push === 'function') {
+            router.push("/setup");
+          } else {
+            window.location.href = "/setup";
+          }
         }
       } catch (profileError) {
         console.error("Profile creation failed:", profileError);
+        // If profile creation fails, still redirect to setup as fallback
+        if (router && typeof router.push === 'function') {
+          router.push("/setup");
+        } else {
+          window.location.href = "/setup";
+        }
       }
-      
-      router.push("/setup");
     } catch (error: unknown) {
       setError(getErrorMessage(error));
     } finally {

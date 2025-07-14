@@ -106,14 +106,24 @@ export function SignInForm({ className }: SignInFormProps) {
       if (inviteToken) {
         try {
           await acceptInvitation({ inviteToken });
-          router.push("/");
+          // Safe router redirect with null check
+          if (router && typeof router.push === 'function') {
+            router.push("/");
+          } else {
+            window.location.href = "/";
+          }
           return;
         } catch (inviteError) {
           console.error("Failed to accept invitation:", inviteError);
         }
       }
       
-      router.push("/");
+      // Safe router redirect with null check
+      if (router && typeof router.push === 'function') {
+        router.push("/");
+      } else {
+        window.location.href = "/";
+      }
     } catch (error: unknown) {
       setError(getErrorMessage(error));
     } finally {

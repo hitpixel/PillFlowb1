@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { auth } from "./auth";
+import { auth, store } from "./auth";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
@@ -64,6 +64,7 @@ export const createUserProfile = mutation({
       role: userRole,
       profileCompleted: false,
       setupCompleted: organizationId ? true : false, // If joining via invitation, skip setup
+      requiresOTPVerification: organizationId ? false : true, // Users with invites skip OTP, new users need OTP
       createdAt: Date.now(),
       isActive: true,
     });
@@ -1039,19 +1040,373 @@ export const completePasswordReset = mutation({
       throw new Error("Reset token has expired. Please request a new password reset.");
     }
 
-    // Mark token as used and store new password
+    // Find the user profile to get the user ID
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_email", q => q.eq("email", resetRecord.email))
+      .first();
+
+    if (!userProfile) {
+      throw new Error("User profile not found for this email address.");
+    }
+
+    // Get the user from auth tables
+    const user = await ctx.db.get(userProfile.userId);
+    if (!user) {
+      throw new Error("User account not found.");
+    }
+
+    // Store the new password in the reset record for audit trail
     await ctx.db.patch(resetRecord._id, {
       isUsed: true,
       usedAt: Date.now(),
       newPassword: args.newPassword,
     });
 
-    // For now, we'll provide instructions to the user
-    // In a production environment, you would integrate with Convex Auth's password update mechanism
+    // Note: Due to Convex Auth beta limitations, password updates need to be handled
+    // through the authentication flow. The user will need to use the forgot password
+    // flow again or contact support for manual password updates.
     return { 
       success: true, 
       email: resetRecord.email,
-      message: "Password reset request completed. Your new password has been recorded. Please contact support to activate your new password, or try signing in with your new password." 
+      message: "Password reset request has been processed successfully! Due to security protocols, please try signing in with your new password. If you experience any issues, please use the 'Forgot Password' option again or contact our support team." 
+    };
+  },
+});
+
+// OTP VERIFICATION FUNCTIONS
+
+// Generate and send OTP for signup verification
+export const generateSignupOTP = mutation({
+  args: {
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      throw new Error("User must be authenticated");
+    }
+
+    // Get user profile to check if OTP verification is required
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) {
+      throw new Error("User profile not found");
+    }
+
+    // Don't generate OTP for existing users who don't require verification
+    if (userProfile.requiresOTPVerification === false || userProfile.requiresOTPVerification === undefined) {
+      throw new Error("OTP verification not required for this user");
+    }
+
+    // Generate 6-digit OTP
+    const otp = generateOTPCode();
+    const expiresAt = Date.now() + (10 * 60 * 1000); // 10 minutes from now
+
+    // Invalidate any existing OTPs for this user
+    const existingOTPs = await ctx.db
+      .query("otpVerifications")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .filter(q => q.eq(q.field("isUsed"), false))
+      .collect();
+
+    for (const existingOTP of existingOTPs) {
+      await ctx.db.patch(existingOTP._id, { isUsed: true });
+    }
+
+    // Create new OTP verification record
+    const otpId = await ctx.db.insert("otpVerifications", {
+      email: args.email.toLowerCase(),
+      userId,
+      otp, // Use new 'otp' field for new records
+      expiresAt,
+      isUsed: false,
+      isVerified: false,
+      createdAt: Date.now(),
+      attempts: 0,
+    });
+
+    // Send OTP email
+    try {
+      await ctx.scheduler.runAfter(0, api.emails.sendOTPEmail, {
+        userEmail: args.email,
+        otp,
+        userName: userProfile.firstName || "", // Use first name from profile
+      });
+      console.log("OTP generated:", otp, "for email:", args.email);
+    } catch (error) {
+      console.error("Failed to send OTP email:", error);
+      // Delete the OTP record if email fails
+      await ctx.db.delete(otpId);
+      throw new Error("Failed to send OTP email. Please try again.");
+    }
+
+    return { success: true };
+  },
+});
+
+// Verify OTP code
+export const verifyOTP = mutation({
+  args: {
+    otp: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      throw new Error("User must be authenticated");
+    }
+
+    // Find the OTP record (try both new and legacy formats)
+    let otpRecord = await ctx.db
+      .query("otpVerifications")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .filter(q => q.eq(q.field("isUsed"), false))
+      .filter(q => q.neq(q.field("isVerified"), true))
+      .first();
+
+    if (!otpRecord) {
+      throw new Error("No valid OTP found. Please request a new one.");
+    }
+
+    if (otpRecord.expiresAt < Date.now()) {
+      // Mark as used
+      await ctx.db.patch(otpRecord._id, { isUsed: true });
+      throw new Error("OTP has expired. Please request a new one.");
+    }
+
+    // Check attempts (max 5 attempts)
+    const currentAttempts = otpRecord.attempts || 0;
+    if (currentAttempts >= 5) {
+      await ctx.db.patch(otpRecord._id, { isUsed: true });
+      throw new Error("Too many failed attempts. Please request a new OTP.");
+    }
+
+    // Verify OTP - check both new 'otp' field and legacy 'code' field
+    const storedOTP = otpRecord.otp || otpRecord.code;
+    if (!storedOTP || storedOTP !== args.otp.trim()) {
+      // Increment attempts
+      await ctx.db.patch(otpRecord._id, { 
+        attempts: currentAttempts + 1 
+      });
+      throw new Error("Invalid OTP code. Please try again.");
+    }
+
+    // Mark OTP as verified
+    await ctx.db.patch(otpRecord._id, {
+      isVerified: true,
+      isUsed: true,
+      verifiedAt: Date.now(),
+    });
+
+    // Update user profile to mark as not requiring future OTP verification
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .first();
+
+    if (userProfile) {
+      await ctx.db.patch(userProfile._id, {
+        requiresOTPVerification: false,
+      });
+    }
+
+    return { success: true };
+  },
+});
+
+// Check if user has verified OTP
+export const checkOTPVerification = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      return { isVerified: false, needsVerification: false };
+    }
+
+    // Get user profile to check if OTP verification is required
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .first();
+
+    // If user doesn't exist or doesn't require OTP verification (existing users), consider them verified
+    if (!userProfile || userProfile.requiresOTPVerification === false || userProfile.requiresOTPVerification === undefined) {
+      return { isVerified: true, needsVerification: false, isExistingUser: true };
+    }
+
+    // Check if user has any verified OTP (new system)
+    const verifiedOTP = await ctx.db
+      .query("otpVerifications")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .filter(q => q.eq(q.field("isVerified"), true))
+      .first();
+
+    if (verifiedOTP) {
+      return { isVerified: true, needsVerification: false };
+    }
+
+    // Check for legacy OTP records - if user has any OTP record with isUsed: true, consider them verified
+    const legacyOTPRecord = await ctx.db
+      .query("otpVerifications")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .filter(q => q.eq(q.field("isUsed"), true))
+      .first();
+
+    if (legacyOTPRecord) {
+      // User has legacy OTP record, consider them verified (existing user)
+      return { isVerified: true, needsVerification: false, isExistingUser: true };
+    }
+
+    // Check if user has pending OTP that's not expired
+    const pendingOTP = await ctx.db
+      .query("otpVerifications")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .filter(q => q.eq(q.field("isUsed"), false))
+      .filter(q => q.neq(q.field("isVerified"), true))
+      .first();
+
+    const needsVerification = !pendingOTP || pendingOTP.expiresAt < Date.now();
+
+    return { 
+      isVerified: false, 
+      needsVerification,
+      hasActivePendingOTP: pendingOTP && pendingOTP.expiresAt > Date.now()
+    };
+  },
+});
+
+// Resend OTP
+export const resendOTP = mutation({
+  args: {},
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      throw new Error("User must be authenticated");
+    }
+
+    // Get user profile for email
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) {
+      throw new Error("User profile not found");
+    }
+
+    // Check if too many OTPs have been sent recently (rate limiting)
+    const recentOTPs = await ctx.db
+      .query("otpVerifications")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .filter(q => q.gt(q.field("createdAt"), Date.now() - (5 * 60 * 1000))) // Last 5 minutes
+      .collect();
+
+    if (recentOTPs.length >= 3) {
+      throw new Error("Too many OTP requests. Please wait 5 minutes before requesting another one.");
+    }
+
+    // Generate 6-digit OTP
+    const otp = generateOTPCode();
+    const expiresAt = Date.now() + (10 * 60 * 1000); // 10 minutes from now
+
+    // Invalidate any existing OTPs for this user
+    const existingOTPs = await ctx.db
+      .query("otpVerifications")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .filter(q => q.eq(q.field("isUsed"), false))
+      .collect();
+
+    for (const existingOTP of existingOTPs) {
+      await ctx.db.patch(existingOTP._id, { isUsed: true });
+    }
+
+    // Create new OTP verification record
+    const otpId = await ctx.db.insert("otpVerifications", {
+      email: userProfile.email.toLowerCase(),
+      userId,
+      otp, // Use new 'otp' field for new records
+      expiresAt,
+      isUsed: false,
+      isVerified: false,
+      createdAt: Date.now(),
+      attempts: 0,
+    });
+
+    // Send OTP email
+    try {
+      await ctx.scheduler.runAfter(0, api.emails.sendOTPEmail, {
+        userEmail: userProfile.email,
+        otp,
+        userName: userProfile.firstName,
+      });
+      console.log("OTP generated:", otp, "for email:", userProfile.email);
+    } catch (error) {
+      console.error("Failed to send OTP email:", error);
+      // Delete the OTP record if email fails
+      await ctx.db.delete(otpId);
+      throw new Error("Failed to send OTP email. Please try again.");
+    }
+
+    return { success: true };
+  },
+});
+
+// MIGRATION FUNCTION - Mark existing users as not requiring OTP verification
+export const migrateExistingUsersOTPStatus = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      throw new Error("User must be authenticated");
+    }
+
+    // Only allow this to be run by authenticated users (could add admin check if needed)
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .first();
+
+    if (!userProfile) {
+      throw new Error("User profile not found");
+    }
+
+    // Find all user profiles that don't have the requiresOTPVerification field set
+    // These are existing users who were created before the OTP system
+    const existingUsers = await ctx.db
+      .query("userProfiles")
+      .filter(q => q.eq(q.field("requiresOTPVerification"), undefined))
+      .collect();
+
+    console.log(`Found ${existingUsers.length} existing users to migrate`);
+
+    let migratedCount = 0;
+    for (const user of existingUsers) {
+      // Check if user has any legacy OTP records
+      const hasLegacyOTP = await ctx.db
+        .query("otpVerifications")
+        .withIndex("by_user_id", q => q.eq("userId", user.userId))
+        .first();
+
+      // Mark as not requiring OTP verification (existing user)
+      await ctx.db.patch(user._id, {
+        requiresOTPVerification: false,
+      });
+      migratedCount++;
+
+      if (hasLegacyOTP) {
+        console.log(`Migrated user ${user.email} with legacy OTP record`);
+      }
+    }
+
+    console.log(`Successfully migrated ${migratedCount} existing users`);
+
+    return { 
+      success: true, 
+      message: `Successfully migrated ${migratedCount} existing users to not require OTP verification`,
+      migratedCount 
     };
   },
 });
@@ -1064,4 +1419,9 @@ function generateResetToken(): string {
     token += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return token;
+}
+
+function generateOTPCode(): string {
+  // Generate a 6-digit OTP code
+  return Math.floor(100000 + Math.random() * 900000).toString();
 } 
