@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const { signIn } = useAuthActions();
@@ -75,7 +74,7 @@ export default function ForgotPasswordPage() {
                   Reset Password
                 </h1>
                 <p className="text-base lg:text-lg text-black">
-                  Enter your email address and we'll send you a code to reset your password
+                  Enter your email address and we&apos;ll send you a code to reset your password
                 </p>
               </div>
 
