@@ -1,4 +1,4 @@
-PillFlow
+PillFlows
 
 # Welcome to your Convex + Next.js + Convex Auth app
 
