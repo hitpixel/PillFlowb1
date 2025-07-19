@@ -18,7 +18,7 @@ export default defineSchema({
     aphraRegistrationNumber: v.optional(v.string()),
     healthcareProfessionalType: v.optional(v.union(
       v.literal("pharmacist"),
-      v.literal("general_practitioner"), 
+      v.literal("general_practitioner"),
       v.literal("nurse"),
       v.literal("administration"),
       v.literal("aged_care_worker"),
@@ -30,7 +30,8 @@ export default defineSchema({
       v.literal("owner"),
       v.literal("admin"),
       v.literal("member"),
-      v.literal("viewer")
+      v.literal("viewer"),
+      v.literal("super_admin")
     )),
     profileCompleted: v.boolean(),
     setupCompleted: v.boolean(),
@@ -39,6 +40,8 @@ export default defineSchema({
     requiresOTPVerification: v.optional(v.boolean()), // New field - true for new users, false/undefined for existing
     createdAt: v.float64(),
     isActive: v.boolean(),
+    isApproved: v.optional(v.boolean()),
+    approvedAt: v.optional(v.float64()),
   })
     .index("by_user_id", ["userId"])
     .index("by_organization", ["organizationId"])
@@ -75,6 +78,8 @@ export default defineSchema({
     ownerId: v.id("userProfiles"),
     createdAt: v.float64(),
     isActive: v.boolean(),
+    isApproved: v.optional(v.boolean()),
+    approvedAt: v.optional(v.float64()),
   })
     .index("by_owner", ["ownerId"])
     .index("by_email", ["email"]),
@@ -152,6 +157,10 @@ export default defineSchema({
       v.literal("blister"),
       v.literal("sachets")
     ),
+    // Medicare card information (for backward compatibility)
+    medicareCardNumber: v.optional(v.string()),
+    medicareCardExpiry: v.optional(v.string()),
+    medicareCardIRN: v.optional(v.string()),
     // Metadata
     createdBy: v.id("userProfiles"),
     createdAt: v.float64(),
