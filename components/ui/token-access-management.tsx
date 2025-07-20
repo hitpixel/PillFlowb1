@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
-import { 
-  Shield, 
-  UserCheck, 
-  Clock, 
-  Eye, 
-  MessageSquare, 
+import {
+  Shield,
+  UserCheck,
+  Clock,
+  Eye,
+  MessageSquare,
   Pill,
   AlertTriangle,
   Plus,
@@ -23,9 +23,7 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  Search,
-  User,
-  Mail
+  Search
 } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -45,7 +43,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface TokenAccessManagementProps {
@@ -481,7 +478,7 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
               <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No access grants found</p>
               <p className="text-sm text-muted-foreground">
-                Grant access to other users to share this patient's data
+                Grant access to other users to share this patient&apos;s data
               </p>
             </div>
           ) : (
