@@ -68,6 +68,11 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
     expiresInDays: 7,
     neverExpires: false,
   });
+  const [inviteMode, setInviteMode] = useState<"existing" | "email">("existing");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteFirstName, setInviteFirstName] = useState("");
+  const [inviteLastName, setInviteLastName] = useState("");
+  const [isInviting, setIsInviting] = useState(false);
 
   // Query for access grants
   const accessGrants = useQuery(api.patientManagement.getPatientAccessGrants, {
@@ -85,6 +90,7 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
   const approveAccess = useMutation(api.patientManagement.approveTokenAccess);
   const denyAccess = useMutation(api.patientManagement.denyTokenAccess);
   const grantAccess = useMutation(api.patientManagement.grantTokenAccess);
+  const inviteUser = useMutation(api.patientManagement.inviteUserAndGrantTokenAccess);
 
   const handleGrantAccess = async () => {
     if (!selectedUser) {
@@ -123,6 +129,67 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
       console.error(error);
     } finally {
       setIsGranting(false);
+    }
+  };
+
+  const handleInviteUser = async () => {
+    if (!inviteEmail.trim()) {
+      toast.error("Please enter an email address");
+      return;
+    }
+
+    if (!inviteFirstName.trim() || !inviteLastName.trim()) {
+      toast.error("Please enter first and last name");
+      return;
+    }
+
+    if (grantFormData.permissions.length === 0) {
+      toast.error("Please select at least one permission");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(inviteEmail)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    try {
+      setIsInviting(true);
+      
+      await inviteUser({
+        patientId: patientId as Id<"patients">,
+        email: inviteEmail.trim(),
+        firstName: inviteFirstName.trim(),
+        lastName: inviteLastName.trim(),
+        permissions: grantFormData.permissions as ("view" | "comment" | "view_medications")[],
+        expiresInDays: grantFormData.neverExpires ? undefined : grantFormData.expiresInDays,
+      });
+      
+      toast.success(`Invitation sent to ${inviteEmail}`);
+      
+      // Reset form
+      setInviteEmail("");
+      setInviteFirstName("");
+      setInviteLastName("");
+      setGrantFormData({
+        permissions: ["view"],
+        expiresInDays: 7,
+        neverExpires: false,
+      });
+      
+    } catch (error: any) {
+      if (error.message?.includes("already invited")) {
+        toast.error("This email has already been invited");
+      } else if (error.message?.includes("already has access")) {
+        toast.error("This user already has access to this patient");
+      } else {
+        toast.error("Failed to send invitation");
+      }
+      console.error(error);
+    } finally {
+      setIsInviting(false);
     }
   };
 
@@ -274,86 +341,194 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Search User</Label>
-            <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={isSearchOpen}
-                  className="w-full justify-between"
-                >
-                  {selectedUser ? (
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${getUserDisplayName(selectedUser)}`} />
-                        <AvatarFallback>{getUserInitials(selectedUser)}</AvatarFallback>
-                      </Avatar>
-                      <div className="text-left">
-                        <div className="text-sm font-medium">{getUserDisplayName(selectedUser)}</div>
-                        <div className="text-xs text-muted-foreground">{selectedUser.email}</div>
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">Search users by name or email...</span>
-                  )}
-                  <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput
-                    placeholder="Search users by name or email..."
-                    value={searchQuery}
-                    onValueChange={setSearchQuery}
-                  />
-                  <CommandList>
-                    <CommandEmpty>No users found.</CommandEmpty>
-                    <CommandGroup>
-                      {userSearchResults?.map((user: UserSearchResult) => (
-                        <CommandItem
-                          key={user._id}
-                          value={`${user.firstName} ${user.lastName} ${user.email}`}
-                          onSelect={() => {
-                            setSelectedUser(user);
-                            setIsSearchOpen(false);
-                            setSearchQuery("");
-                          }}
-                        >
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${getUserDisplayName(user)}`} />
-                              <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="font-medium">{getUserDisplayName(user)}</div>
-                              <div className="text-sm text-muted-foreground">{user.email}</div>
-                              <div className="text-xs text-muted-foreground">{user.organizationName} • {user.organizationType}</div>
-                            </div>
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+          {/* Mode Selection */}
+          <div className="flex gap-2">
+            <Button
+              variant={inviteMode === "existing" ? "default" : "outline"}
+              onClick={() => setInviteMode("existing")}
+              className="flex-1"
+            >
+              Existing User
+            </Button>
+            <Button
+              variant={inviteMode === "email" ? "default" : "outline"}
+              onClick={() => setInviteMode("email")}
+              className="flex-1"
+            >
+              Invite by Email
+            </Button>
           </div>
 
-          {selectedUser && (
+          {inviteMode === "existing" ? (
             <>
+              <div className="space-y-2">
+                <Label>Search User</Label>
+                <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={isSearchOpen}
+                      className="w-full justify-between"
+                    >
+                      {selectedUser ? (
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6">
+                            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${getUserDisplayName(selectedUser)}`} />
+                            <AvatarFallback>{getUserInitials(selectedUser)}</AvatarFallback>
+                          </Avatar>
+                          <div className="text-left">
+                            <div className="text-sm font-medium">{getUserDisplayName(selectedUser)}</div>
+                            <div className="text-xs text-muted-foreground">{selectedUser.email}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Search users by name or email...</span>
+                      )}
+                      <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search users by name or email..."
+                        value={searchQuery}
+                        onValueChange={setSearchQuery}
+                      />
+                      <CommandList>
+                        <CommandEmpty>No users found.</CommandEmpty>
+                        <CommandGroup>
+                          {userSearchResults?.map((user: UserSearchResult) => (
+                            <CommandItem
+                              key={user._id}
+                              value={`${user.firstName} ${user.lastName} ${user.email}`}
+                              onSelect={() => {
+                                setSelectedUser(user);
+                                setIsSearchOpen(false);
+                                setSearchQuery("");
+                              }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${getUserDisplayName(user)}`} />
+                                  <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="font-medium">{getUserDisplayName(user)}</div>
+                                  <div className="text-sm text-muted-foreground">{user.email}</div>
+                                  <div className="text-xs text-muted-foreground">{user.organizationName} • {user.organizationType}</div>
+                                </div>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {selectedUser && (
+                <>
+                  <div className="space-y-3">
+                    <Label>Permissions</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {["view", "comment", "view_medications"].map((permission) => (
+                        <div key={permission} className="flex items-center space-x-2">
+                          <Switch
+                            id={permission}
+                            checked={grantFormData.permissions.includes(permission)}
+                            onCheckedChange={() => handlePermissionToggle(permission)}
+                          />
+                          <Label htmlFor={permission} className="flex items-center gap-1 text-sm">
+                            {getPermissionIcon(permission)}
+                            {getPermissionLabel(permission)}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label>Access Duration</Label>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="neverExpires"
+                        checked={grantFormData.neverExpires}
+                        onCheckedChange={(checked: boolean) => setGrantFormData(prev => ({ ...prev, neverExpires: checked }))}
+                      />
+                      <Label htmlFor="neverExpires" className="text-sm">
+                        Never expires
+                      </Label>
+                    </div>
+                    
+                    {!grantFormData.neverExpires && (
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          max="365"
+                          value={grantFormData.expiresInDays}
+                          onChange={(e) => setGrantFormData(prev => ({ ...prev, expiresInDays: parseInt(e.target.value) }))}
+                          className="w-20"
+                        />
+                        <span className="text-sm text-muted-foreground">days</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <Button
+                    onClick={handleGrantAccess}
+                    disabled={isGranting || !selectedUser || grantFormData.permissions.length === 0}
+                    className="w-full"
+                  >
+                    {isGranting ? "Granting Access..." : `Grant Access to ${getUserDisplayName(selectedUser)}`}
+                  </Button>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label>Email Address</Label>
+                <Input
+                  type="email"
+                  placeholder="user@example.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>First Name</Label>
+                  <Input
+                    placeholder="John"
+                    value={inviteFirstName}
+                    onChange={(e) => setInviteFirstName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Last Name</Label>
+                  <Input
+                    placeholder="Doe"
+                    value={inviteLastName}
+                    onChange={(e) => setInviteLastName(e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <Label>Permissions</Label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {["view", "comment", "view_medications"].map((permission) => (
                     <div key={permission} className="flex items-center space-x-2">
                       <Switch
-                        id={permission}
+                        id={`email-${permission}`}
                         checked={grantFormData.permissions.includes(permission)}
                         onCheckedChange={() => handlePermissionToggle(permission)}
                       />
-                      <Label htmlFor={permission} className="flex items-center gap-1 text-sm">
+                      <Label htmlFor={`email-${permission}`} className="flex items-center gap-1 text-sm">
                         {getPermissionIcon(permission)}
                         {getPermissionLabel(permission)}
                       </Label>
@@ -366,11 +541,11 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
                 <Label>Access Duration</Label>
                 <div className="flex items-center space-x-2">
                   <Switch
-                    id="neverExpires"
+                    id="email-neverExpires"
                     checked={grantFormData.neverExpires}
                     onCheckedChange={(checked: boolean) => setGrantFormData(prev => ({ ...prev, neverExpires: checked }))}
                   />
-                  <Label htmlFor="neverExpires" className="text-sm">
+                  <Label htmlFor="email-neverExpires" className="text-sm">
                     Never expires
                   </Label>
                 </div>
@@ -390,12 +565,12 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
                 )}
               </div>
 
-              <Button 
-                onClick={handleGrantAccess}
-                disabled={isGranting || !selectedUser || grantFormData.permissions.length === 0}
+              <Button
+                onClick={handleInviteUser}
+                disabled={isInviting || !inviteEmail.trim() || !inviteFirstName.trim() || !inviteLastName.trim() || grantFormData.permissions.length === 0}
                 className="w-full"
               >
-                {isGranting ? "Granting Access..." : `Grant Access to ${getUserDisplayName(selectedUser)}`}
+                {isInviting ? "Sending Invitation..." : `Send Invitation to ${inviteEmail}`}
               </Button>
             </>
           )}
@@ -403,59 +578,87 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
       </Card>
 
       {/* Pending Access Requests */}
-      {accessGrants?.some((grant: any) => grant.status === "pending") && (
+      {accessGrants?.some((grant: any) => grant.status === "pending" || grant.status === "pending_invitation") && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-yellow-600" />
-              Pending Access Requests
+              Pending Access Requests & Invitations
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {accessGrants
-                ?.filter((grant: any) => grant.status === "pending")
+                ?.filter((grant: any) => grant.status === "pending" || grant.status === "pending_invitation")
                 .map((grant: any) => (
-                  <div key={grant._id} className="border rounded-lg p-4 bg-yellow-50">
+                  <div key={grant._id} className={`border rounded-lg p-4 ${grant.status === "pending_invitation" ? "bg-blue-50" : "bg-yellow-50"}`}>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2">
-                          <AlertCircle className="h-4 w-4 text-yellow-600" />
-                          <span className="font-medium">
-                            {grant.grantedToUser?.firstName} {grant.grantedToUser?.lastName}
-                          </span>
-                          <span className="text-sm text-muted-foreground">
-                            ({grant.grantedToUser?.email})
-                          </span>
+                          <AlertCircle className={`h-4 w-4 ${grant.status === "pending_invitation" ? "text-blue-600" : "text-yellow-600"}`} />
+                          {grant.status === "pending_invitation" ? (
+                            <>
+                              <span className="font-medium">
+                                {grant.invitedFirstName} {grant.invitedLastName}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                ({grant.invitedEmail})
+                              </span>
+                              <Badge variant="outline" className="border-blue-200 bg-blue-100 text-blue-800">
+                                Invitation Sent
+                              </Badge>
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-medium">
+                                {grant.grantedToUser?.firstName} {grant.grantedToUser?.lastName}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                ({grant.grantedToUser?.email})
+                              </span>
+                              <Badge variant="outline">
+                                {grant.grantedToOrg?.name}
+                              </Badge>
+                            </>
+                          )}
                         </div>
-                        <Badge variant="outline">
-                          {grant.grantedToOrg?.name}
-                        </Badge>
                       </div>
                       <div className="flex items-center gap-2">
                         {getStatusBadge(grant.status)}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleApproveAccess(grant._id)}
-                          className="border-green-200 text-green-700 hover:bg-green-50"
-                        >
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDenyAccess(grant._id)}
-                          className="border-red-200 text-red-700 hover:bg-red-50"
-                        >
-                          <XCircle className="h-3 w-3 mr-1" />
-                          Deny
-                        </Button>
+                        {grant.status === "pending" && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleApproveAccess(grant._id)}
+                              className="border-green-200 text-green-700 hover:bg-green-50"
+                            >
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDenyAccess(grant._id)}
+                              className="border-red-200 text-red-700 hover:bg-red-50"
+                            >
+                              <XCircle className="h-3 w-3 mr-1" />
+                              Deny
+                            </Button>
+                          </>
+                        )}
+                        {grant.status === "pending_invitation" && (
+                          <Badge variant="outline" className="border-blue-200 bg-blue-100 text-blue-800">
+                            Awaiting Registration
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Requested {formatDistanceToNow(new Date(grant.requestedAt), { addSuffix: true })}
+                      {grant.status === "pending_invitation"
+                        ? `Invited ${formatDistanceToNow(new Date(grant.createdAt), { addSuffix: true })}`
+                        : `Requested ${formatDistanceToNow(new Date(grant.requestedAt), { addSuffix: true })}`
+                      }
                     </div>
                   </div>
                 ))}
@@ -473,7 +676,7 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {accessGrants?.filter((grant: any) => grant.status !== "pending").length === 0 ? (
+          {accessGrants?.filter((grant: any) => !["pending", "pending_invitation"].includes(grant.status)).length === 0 ? (
             <div className="text-center py-8">
               <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No access grants found</p>
@@ -484,7 +687,7 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
           ) : (
             <div className="space-y-4">
               {accessGrants
-                ?.filter((grant: any) => grant.status !== "pending")
+                ?.filter((grant: any) => !["pending", "pending_invitation"].includes(grant.status))
                 .map((grant: any) => (
                   <div key={grant._id} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-3">

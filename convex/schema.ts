@@ -195,8 +195,8 @@ export default defineSchema({
   tokenAccessGrants: defineTable({
     patientId: v.id("patients"),
     shareToken: v.string(),
-    grantedTo: v.id("userProfiles"),
-    grantedToOrg: v.id("organizations"),
+    grantedTo: v.optional(v.id("userProfiles")), // null for pending invitations
+    grantedToOrg: v.optional(v.id("organizations")), // null for pending invitations
     grantedBy: v.optional(v.id("userProfiles")), // null for share token requests
     grantedByOrg: v.id("organizations"),
     accessType: v.union(
@@ -207,7 +207,8 @@ export default defineSchema({
       v.literal("pending"),
       v.literal("approved"),
       v.literal("denied"),
-      v.literal("revoked")
+      v.literal("revoked"),
+      v.literal("pending_invitation") // New status for email invitations
     ),
     permissions: v.array(v.union(
       v.literal("view"),
@@ -222,12 +223,17 @@ export default defineSchema({
     revokedBy: v.optional(v.id("userProfiles")),
     deniedAt: v.optional(v.float64()),
     deniedBy: v.optional(v.id("userProfiles")),
+    // New fields for email invitations
+    invitedEmail: v.optional(v.string()),
+    invitedFirstName: v.optional(v.string()),
+    invitedLastName: v.optional(v.string()),
   })
     .index("by_patient", ["patientId"])
     .index("by_grantee", ["grantedTo"])
     .index("by_share_token", ["shareToken"])
     .index("by_expiry", ["expiresAt"])
-    .index("by_active", ["isActive"]),
+    .index("by_active", ["isActive"])
+    .index("by_invited_email", ["invitedEmail"]),
 
   // Patient medications with FDA NDC support
   patientMedications: defineTable({
