@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { generatePatientAccessGrantEmailHTML } from "./emailTemplates";
+import { resend } from "./emails";
 
 // TOKEN ACCESS MANAGEMENT
 
@@ -113,6 +115,57 @@ export const approveTokenAccess = mutation({
       grantedAt: Date.now(),
       isActive: true,
     });
+
+    // Send email notification to the granted user
+    const grantedToUser = await ctx.db.get(accessGrant.grantedTo);
+    const patient = await ctx.db.get(accessGrant.patientId);
+    const grantedByOrg = await ctx.db.get(userProfile.organizationId!);
+
+    if (grantedToUser && patient && grantedByOrg) {
+      const expiresAtFormatted = expiresAt 
+        ? new Date(expiresAt).toLocaleDateString('en-AU', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : undefined;
+
+      const accessUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://pillflow.app'}/patients/shared/${patient.shareToken}`;
+
+      const emailHtml = generatePatientAccessGrantEmailHTML({
+        patientName: `${patient.firstName} ${patient.lastName}`,
+        grantedByName: `${userProfile.firstName} ${userProfile.lastName}`,
+        grantedByOrganization: grantedByOrg.name,
+        permissions: args.permissions,
+        expiresAt: expiresAtFormatted,
+        accessUrl,
+      });
+
+      try {
+        const emailId = await resend.sendEmail(
+          ctx,
+          "PillFlow Access <noreply@pillflow.com.au>",
+          grantedToUser.email,
+          `Access Granted to ${patient.firstName} ${patient.lastName}`,
+          emailHtml,
+          `Access Granted to ${patient.firstName} ${patient.lastName}
+
+You have been granted access to ${patient.firstName} ${patient.lastName}'s medication information by ${userProfile.firstName} ${userProfile.lastName} from ${grantedByOrg.name}.
+
+You can now view their medication details and request changes as needed.
+
+Access URL: ${accessUrl}
+
+Best regards,
+The PillFlow Team`
+        );
+        console.log("Access grant email sent:", emailId);
+      } catch (error) {
+        console.error("Failed to send access grant email:", error);
+      }
+    }
   },
 });
 
@@ -153,7 +206,7 @@ export const denyTokenAccess = mutation({
   },
 });
 
-// Grant access to a patient's data (direct grant)
+// Grant access to a patient's data (direct grant with email notification)
 export const grantTokenAccess = mutation({
   args: {
     patientId: v.id("patients"),
@@ -201,6 +254,8 @@ export const grantTokenAccess = mutation({
       .filter((q) => q.eq(q.field("isActive"), true))
       .first();
 
+    let accessGrantId: string;
+
     if (existingAccess) {
       // Update existing access
       await ctx.db.patch(existingAccess._id, {
@@ -210,29 +265,80 @@ export const grantTokenAccess = mutation({
         grantedAt: Date.now(),
         status: "approved",
       });
-      return existingAccess._id;
+      accessGrantId = existingAccess._id;
+    } else {
+      // Create new access grant
+      const accessType = patient.organizationId === grantedToUser.organizationId 
+        ? "same_organization" 
+        : "cross_organization";
+
+      accessGrantId = await ctx.db.insert("tokenAccessGrants", {
+        patientId: args.patientId,
+        shareToken: patient.shareToken,
+        grantedTo: args.grantedToUserId,
+        grantedToOrg: grantedToUser.organizationId!,
+        grantedBy: userProfile._id,
+        grantedByOrg: userProfile.organizationId!,
+        accessType,
+        status: "approved",
+        permissions: args.permissions,
+        expiresAt,
+        isActive: true,
+        requestedAt: Date.now(),
+        grantedAt: Date.now(),
+      });
     }
 
-    // Create new access grant
-    const accessType = patient.organizationId === grantedToUser.organizationId 
-      ? "same_organization" 
-      : "cross_organization";
+    // Send email notification to the granted user
+    const grantedByOrg = await ctx.db.get(userProfile.organizationId!);
 
-    return await ctx.db.insert("tokenAccessGrants", {
-      patientId: args.patientId,
-      shareToken: patient.shareToken,
-      grantedTo: args.grantedToUserId,
-      grantedToOrg: grantedToUser.organizationId!,
-      grantedBy: userProfile._id,
-      grantedByOrg: userProfile.organizationId!,
-      accessType,
-      status: "approved",
-      permissions: args.permissions,
-      expiresAt,
-      isActive: true,
-      requestedAt: Date.now(),
-      grantedAt: Date.now(),
-    });
+    if (grantedByOrg) {
+      const expiresAtFormatted = expiresAt 
+        ? new Date(expiresAt).toLocaleDateString('en-AU', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : undefined;
+
+      const accessUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://pillflow.app'}/patients/shared/${patient.shareToken}`;
+
+      const emailHtml = generatePatientAccessGrantEmailHTML({
+        patientName: `${patient.firstName} ${patient.lastName}`,
+        grantedByName: `${userProfile.firstName} ${userProfile.lastName}`,
+        grantedByOrganization: grantedByOrg.name,
+        permissions: args.permissions,
+        expiresAt: expiresAtFormatted,
+        accessUrl,
+      });
+
+      try {
+        const emailId = await resend.sendEmail(
+          ctx,
+          "PillFlow Access <noreply@pillflow.com.au>",
+          grantedToUser.email,
+          `Access Granted to ${patient.firstName} ${patient.lastName}`,
+          emailHtml,
+          `Access Granted to ${patient.firstName} ${patient.lastName}
+
+You have been granted access to ${patient.firstName} ${patient.lastName}'s medication information by ${userProfile.firstName} ${userProfile.lastName} from ${grantedByOrg.name}.
+
+You can now view their medication details and request changes as needed.
+
+Access URL: ${accessUrl}
+
+Best regards,
+The PillFlow Team`
+        );
+        console.log("Access grant email sent:", emailId);
+      } catch (error) {
+        console.error("Failed to send access grant email:", error);
+      }
+    }
+
+    return accessGrantId;
   },
 });
 
@@ -1276,7 +1382,6 @@ export const rejectMedicationRequest = mutation({
   },
 });
 
-
 // Request medication addition (for shared users)
 export const requestMedicationAddition = mutation({
   args: {
@@ -1848,4 +1953,4 @@ async function logMedicationChange(ctx: any, params: {
     previousState: params.previousState,
     status: params.status || "completed",
   });
-} 
+}

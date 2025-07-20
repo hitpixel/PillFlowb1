@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,22 +22,51 @@ import {
   Calendar,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Search,
+  User,
+  Mail
 } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface TokenAccessManagementProps {
   patientId: string;
 }
 
+interface UserSearchResult {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  organizationName: string;
+  organizationType: string;
+}
+
 export function TokenAccessManagement({ patientId }: TokenAccessManagementProps) {
   const [isGranting, setIsGranting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [grantFormData, setGrantFormData] = useState({
-    userEmail: "",
     permissions: ["view"],
     expiresInDays: 7,
     neverExpires: false,
@@ -48,27 +77,45 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
     patientId: patientId as Id<"patients">,
   });
 
+  // Query for user search
+  const userSearchResults = useQuery(
+    api.users.searchUsers,
+    searchQuery.trim() ? { searchTerm: searchQuery } : "skip"
+  );
+
   // Mutations
   const revokeAccess = useMutation(api.patientManagement.revokeTokenAccess);
   const approveAccess = useMutation(api.patientManagement.approveTokenAccess);
   const denyAccess = useMutation(api.patientManagement.denyTokenAccess);
+  const grantAccess = useMutation(api.patientManagement.grantTokenAccess);
 
   const handleGrantAccess = async () => {
-    if (!grantFormData.userEmail) {
-      toast.error("Please enter a user email");
+    if (!selectedUser) {
+      toast.error("Please select a user to grant access");
+      return;
+    }
+
+    if (grantFormData.permissions.length === 0) {
+      toast.error("Please select at least one permission");
       return;
     }
 
     try {
       setIsGranting(true);
       
-      // For demo purposes, we'll need to find the user by email
-      // In a real app, you'd have a user search/selection component
-      toast.info("Grant access feature coming soon - need user search functionality");
+      await grantAccess({
+        patientId: patientId as Id<"patients">,
+        grantedToUserId: selectedUser._id as Id<"userProfiles">,
+        permissions: grantFormData.permissions as ("view" | "comment" | "view_medications")[],
+        expiresInDays: grantFormData.neverExpires ? undefined : grantFormData.expiresInDays,
+      });
+      
+      toast.success(`Access granted to ${selectedUser.firstName} ${selectedUser.lastName}`);
       
       // Reset form
+      setSelectedUser(null);
+      setSearchQuery("");
       setGrantFormData({
-        userEmail: "",
         permissions: ["view"],
         expiresInDays: 7,
         neverExpires: false,
@@ -200,6 +247,14 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
     }
   };
 
+  const getUserDisplayName = (user: UserSearchResult) => {
+    return `${user.firstName} ${user.lastName}`;
+  };
+
+  const getUserInitials = (user: UserSearchResult) => {
+    return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -209,7 +264,7 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
           <h3 className="text-lg font-semibold">Token Access Management</h3>
         </div>
         <Badge variant="outline">
-          {accessGrants?.length || 0} Active Grants
+          {accessGrants?.filter((g: any) => g.status === "approved" && g.isActive).length || 0} Active Grants
         </Badge>
       </div>
 
@@ -223,69 +278,130 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="userEmail">User Email</Label>
-            <Input
-              id="userEmail"
-              placeholder="Enter user email address"
-              value={grantFormData.userEmail}
-              onChange={(e) => setGrantFormData(prev => ({ ...prev, userEmail: e.target.value }))}
-            />
+            <Label>Search User</Label>
+            <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={isSearchOpen}
+                  className="w-full justify-between"
+                >
+                  {selectedUser ? (
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${getUserDisplayName(selectedUser)}`} />
+                        <AvatarFallback>{getUserInitials(selectedUser)}</AvatarFallback>
+                      </Avatar>
+                      <div className="text-left">
+                        <div className="text-sm font-medium">{getUserDisplayName(selectedUser)}</div>
+                        <div className="text-xs text-muted-foreground">{selectedUser.email}</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">Search users by name or email...</span>
+                  )}
+                  <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput
+                    placeholder="Search users by name or email..."
+                    value={searchQuery}
+                    onValueChange={setSearchQuery}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No users found.</CommandEmpty>
+                    <CommandGroup>
+                      {userSearchResults?.map((user: UserSearchResult) => (
+                        <CommandItem
+                          key={user._id}
+                          value={`${user.firstName} ${user.lastName} ${user.email}`}
+                          onSelect={() => {
+                            setSelectedUser(user);
+                            setIsSearchOpen(false);
+                            setSearchQuery("");
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${getUserDisplayName(user)}`} />
+                              <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="font-medium">{getUserDisplayName(user)}</div>
+                              <div className="text-sm text-muted-foreground">{user.email}</div>
+                              <div className="text-xs text-muted-foreground">{user.organizationName} • {user.organizationType}</div>
+                            </div>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
-          <div className="space-y-3">
-            <Label>Permissions</Label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {["view", "comment", "view_medications"].map((permission) => (
-                <div key={permission} className="flex items-center space-x-2">
+          {selectedUser && (
+            <>
+              <div className="space-y-3">
+                <Label>Permissions</Label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {["view", "comment", "view_medications"].map((permission) => (
+                    <div key={permission} className="flex items-center space-x-2">
+                      <Switch
+                        id={permission}
+                        checked={grantFormData.permissions.includes(permission)}
+                        onCheckedChange={() => handlePermissionToggle(permission)}
+                      />
+                      <Label htmlFor={permission} className="flex items-center gap-1 text-sm">
+                        {getPermissionIcon(permission)}
+                        {getPermissionLabel(permission)}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Access Duration</Label>
+                <div className="flex items-center space-x-2">
                   <Switch
-                    id={permission}
-                    checked={grantFormData.permissions.includes(permission)}
-                    onCheckedChange={() => handlePermissionToggle(permission)}
+                    id="neverExpires"
+                    checked={grantFormData.neverExpires}
+                    onCheckedChange={(checked: boolean) => setGrantFormData(prev => ({ ...prev, neverExpires: checked }))}
                   />
-                  <Label htmlFor={permission} className="flex items-center gap-1 text-sm">
-                    {getPermissionIcon(permission)}
-                    {getPermissionLabel(permission)}
+                  <Label htmlFor="neverExpires" className="text-sm">
+                    Never expires
                   </Label>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <Label>Access Duration</Label>
-            <div className="flex items-center space-x-2">
-                             <Switch
-                 id="neverExpires"
-                 checked={grantFormData.neverExpires}
-                 onCheckedChange={(checked: boolean) => setGrantFormData(prev => ({ ...prev, neverExpires: checked }))}
-               />
-              <Label htmlFor="neverExpires" className="text-sm">
-                Never expires
-              </Label>
-            </div>
-            
-            {!grantFormData.neverExpires && (
-              <div className="flex items-center space-x-2">
-                <Input
-                  type="number"
-                  min="1"
-                  max="365"
-                  value={grantFormData.expiresInDays}
-                  onChange={(e) => setGrantFormData(prev => ({ ...prev, expiresInDays: parseInt(e.target.value) }))}
-                  className="w-20"
-                />
-                <span className="text-sm text-muted-foreground">days</span>
+                
+                {!grantFormData.neverExpires && (
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={grantFormData.expiresInDays}
+                      onChange={(e) => setGrantFormData(prev => ({ ...prev, expiresInDays: parseInt(e.target.value) }))}
+                      className="w-20"
+                    />
+                    <span className="text-sm text-muted-foreground">days</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <Button 
-            onClick={handleGrantAccess}
-            disabled={isGranting || !grantFormData.userEmail || grantFormData.permissions.length === 0}
-            className="w-full"
-          >
-            {isGranting ? "Granting Access..." : "Grant Access"}
-          </Button>
+              <Button 
+                onClick={handleGrantAccess}
+                disabled={isGranting || !selectedUser || grantFormData.permissions.length === 0}
+                className="w-full"
+              >
+                {isGranting ? "Granting Access..." : `Grant Access to ${getUserDisplayName(selectedUser)}`}
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -365,7 +481,7 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
               <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-muted-foreground">No access grants found</p>
               <p className="text-sm text-muted-foreground">
-                Grant access to other users to share this patient&apos;s data
+                Grant access to other users to share this patient's data
               </p>
             </div>
           ) : (
@@ -469,4 +585,4 @@ export function TokenAccessManagement({ patientId }: TokenAccessManagementProps)
       </Alert>
     </div>
   );
-} 
+}

@@ -1424,4 +1424,104 @@ function generateResetToken(): string {
 function generateOTPCode(): string {
   // Generate a 6-digit OTP code
   return Math.floor(100000 + Math.random() * 900000).toString();
-} 
+}
+
+// Search users by name or email for access granting
+export const searchUsers = query({
+  args: {
+    searchTerm: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
+
+    const currentUserProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_user_id", q => q.eq("userId", userId))
+      .first();
+
+    if (!currentUserProfile) {
+      throw new Error("User profile not found");
+    }
+
+    const searchTerm = args.searchTerm.toLowerCase().trim();
+    if (!searchTerm) {
+      return [];
+    }
+
+    // Search users by email or name
+    const users = await ctx.db
+      .query("userProfiles")
+      .filter(q => q.eq(q.field("isActive"), true))
+      .collect();
+
+    // Filter users based on search term
+    const filteredUsers = users.filter(user => {
+      const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
+      const email = user.email.toLowerCase();
+      
+      return (
+        fullName.includes(searchTerm) ||
+        email.includes(searchTerm)
+      );
+    });
+
+    // Enrich with organization details
+    const enrichedUsers = await Promise.all(
+      filteredUsers.map(async (user) => {
+        const organization = user.organizationId
+          ? await ctx.db.get(user.organizationId)
+          : null;
+
+        return {
+          _id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          organizationName: organization?.name || "No Organization",
+          organizationType: organization?.type || "Individual",
+        };
+      })
+    );
+
+    // Limit results to prevent overwhelming the UI
+    return enrichedUsers.slice(0, 10);
+  },
+});
+
+// Get user by email for access granting
+export const getUserByEmail = query({
+  args: {
+    email: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await auth.getUserId(ctx);
+    if (!userId) {
+      throw new Error("Authentication required");
+    }
+
+    const userProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_email", q => q.eq("email", args.email.toLowerCase()))
+      .first();
+
+    if (!userProfile || !userProfile.isActive) {
+      return null;
+    }
+
+    const organization = userProfile.organizationId
+      ? await ctx.db.get(userProfile.organizationId)
+      : null;
+
+    return {
+      _id: userProfile._id,
+      firstName: userProfile.firstName,
+      lastName: userProfile.lastName,
+      email: userProfile.email,
+      organizationName: organization?.name || "No Organization",
+      organizationType: organization?.type || "Individual",
+    };
+  },
+});

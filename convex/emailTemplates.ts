@@ -435,3 +435,124 @@ export function generateOTPEmailHTML({
     </div>
   `;
 }
+
+export function generatePatientAccessGrantEmailHTML({
+  patientName,
+  grantedByName,
+  grantedByOrganization,
+  permissions,
+  expiresAt,
+  accessUrl,
+}: {
+  patientName: string;
+  grantedByName: string;
+  grantedByOrganization: string;
+  permissions: string[];
+  expiresAt?: string;
+  accessUrl: string;
+}): string {
+  const permissionLabels = {
+    view: "View patient details",
+    comment: "Add comments and notes",
+    view_medications: "View medication list",
+  };
+
+  const permissionList = permissions.map(p => permissionLabels[p as keyof typeof permissionLabels] || p);
+
+  return `
+    <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #000000; background-color: #F9F9F9; margin: 0; padding: 0;">
+      <div style="max-width: 480px; margin: 0 auto; padding: 70px 24px;">
+        <div style="background-color: #FFFFFF; border: 1px solid #CECECE; border-radius: 20px; padding: 50px 40px 40px 40px; text-align: center;">
+          <div style="font-family: Inter, sans-serif; font-size: 24px; font-weight: 700; color: #000000; margin-bottom: 40px; letter-spacing: -0.02em;">
+            PillFlow
+          </div>
+
+          <h1 style="font-size: 32px; font-weight: 600; color: #000000; margin: 0 0 17px 0; letter-spacing: -1.2px; line-height: 1.2;">
+            Patient Access Granted
+          </h1>
+
+          <p style="font-size: 16px; color: #000000; margin: 0 0 40px 0; line-height: 1.5; font-weight: 500;">
+            ${grantedByName} from ${grantedByOrganization} has granted you access to patient ${patientName}.
+          </p>
+
+          <div style="background-color: #F9F9F9; border-radius: 12px; padding: 40px; margin-bottom: 40px; text-align: left;">
+            <h2 style="font-size: 20px; font-weight: 600; color: #000000; margin: 0 0 24px 0;">
+              Your Access Permissions
+            </h2>
+            
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+              ${permissionList.map(permission => `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="color: #10b981; font-size: 16px;">✅</span>
+                  <span style="font-size: 16px; color: #000000; font-weight: 500;">${permission}</span>
+                </div>
+              `).join('')}
+            </div>
+            
+            ${expiresAt ? `
+              <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #E5E5E5;">
+                <p style="font-size: 16px; font-weight: 600; color: #000000; margin: 0 0 8px 0;">
+                  Access expires:
+                </p>
+                <p style="font-size: 16px; color: #000000; font-weight: 500;">
+                  ${expiresAt}
+                </p>
+              </div>
+            ` : `
+              <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #E5E5E5;">
+                <p style="font-size: 16px; font-weight: 600; color: #000000; margin: 0 0 8px 0;">
+                  Access duration:
+                </p>
+                <p style="font-size: 16px; color: #000000; font-weight: 500;">
+                  No expiration
+                </p>
+              </div>
+            `}
+          </div>
+
+          <div style="background-color: #FFF3CD; border: 1px solid #FFEAA7; border-radius: 8px; padding: 20px; margin-bottom: 40px; text-align: left;">
+            <h3 style="margin-top: 0; color: #856404; font-size: 16px; font-weight: 600;">
+              🔒 Important Security Notice:
+            </h3>
+            <p style="margin: 10px 0; font-size: 14px; color: #000000; font-weight: 500;">
+              • This access is granted for healthcare collaboration purposes only
+            </p>
+            <p style="margin: 10px 0; font-size: 14px; color: #000000; font-weight: 500;">
+              • All actions are logged for audit purposes
+            </p>
+            <p style="margin: 10px 0; font-size: 14px; color: #000000; font-weight: 500;">
+              • You can request medication changes, but they require approval
+            </p>
+          </div>
+
+          <div style="margin-bottom: 40px;">
+            <a href="${accessUrl}" style="display: inline-block; background-color: #000000; color: #ffffff; font-size: 16px; font-weight: 700; padding: 16px 32px; border-radius: 8px; text-decoration: none; letter-spacing: -0.5px; min-width: 154px;">
+              View Patient
+            </a>
+          </div>
+
+          <div style="margin-bottom: 40px;">
+            <p style="font-size: 16px; color: #000000; margin: 0 0 16px 0; font-weight: 500;">
+              Or copy and paste this link:
+            </p>
+            <div style="background-color: #F5F5F5; padding: 16px; border-radius: 8px; font-size: 14px; color: #000000; word-break: break-all; font-family: monospace; text-align: left;">
+              <a href="${accessUrl}" style="color: #000000; text-decoration: none;">
+                ${accessUrl}
+              </a>
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid #E5E5E5; padding-top: 30px; margin-top: 40px;">
+            <p style="font-size: 16px; color: #000000; margin: 0; line-height: 1.5; font-weight: 500;">
+              Best regards,<br />
+              The PillFlow Team
+            </p>
+            <p style="font-size: 12px; color: #666666; margin: 16px 0 0 0; font-weight: 500;">
+              This email was sent from PillFlow
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}

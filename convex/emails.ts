@@ -10,7 +10,8 @@ import {
   generatePasswordResetEmailHTML,
   generateTestEmailHTML,
   generateTestInvitationEmailHTML,
-  generateOTPEmailHTML
+  generateOTPEmailHTML,
+  generatePatientAccessGrantEmailHTML
 } from "./emailTemplates";
 
 export const resend: Resend = new Resend(components.resend, {
@@ -185,6 +186,65 @@ The PillFlow Team`
       return emailId;
     } catch (error) {
       console.error("Failed to send password reset email:", error);
+      throw error;
+    }
+  },
+});
+
+// Send patient access grant email
+export const sendPatientAccessGrantEmail = mutation({
+  args: {
+    toEmail: v.string(),
+    patientName: v.string(),
+    grantedByName: v.string(),
+    grantedByOrganization: v.string(),
+    permissions: v.array(v.union(
+      v.literal("view"),
+      v.literal("comment"),
+      v.literal("view_medications")
+    )),
+    expiresAt: v.optional(v.string()),
+    accessUrl: v.string(),
+  },
+  handler: async (ctx, args) => {
+    try {
+      console.log("Sending patient access grant email to:", args.toEmail);
+      
+      // Generate HTML content using template function
+      const htmlContent = generatePatientAccessGrantEmailHTML({
+        patientName: args.patientName,
+        grantedByName: args.grantedByName,
+        grantedByOrganization: args.grantedByOrganization,
+        permissions: args.permissions,
+        expiresAt: args.expiresAt,
+        accessUrl: args.accessUrl,
+      });
+      
+      const emailId = await resend.sendEmail(
+        ctx,
+        "PillFlow Access <noreply@pillflow.com.au>",
+        args.toEmail,
+        `Access Granted to ${args.patientName}`,
+        htmlContent,
+        `Access Granted to ${args.patientName}
+
+You have been granted access to ${args.patientName}'s medication information by ${args.grantedByName} from ${args.grantedByOrganization}.
+
+Permissions granted:
+${args.permissions.map(p => `- ${p}`).join('\n')}
+
+${args.expiresAt ? `This access expires on: ${args.expiresAt}` : 'This access does not expire'}
+
+You can access the patient's information at: ${args.accessUrl}
+
+Best regards,
+The PillFlow Team`
+      );
+      
+      console.log("Patient access grant email sent:", emailId);
+      return emailId;
+    } catch (error) {
+      console.error("Failed to send patient access grant email:", error);
       throw error;
     }
   },
@@ -595,4 +655,4 @@ The PillFlow Team`
       throw error;
     }
   },
-}); 
+});
