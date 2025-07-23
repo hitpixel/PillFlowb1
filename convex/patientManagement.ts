@@ -132,7 +132,7 @@ export const approveTokenAccess = mutation({
           })
         : undefined;
 
-      const accessUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://pillflow.app'}/patients/shared/${patient.shareToken}`;
+      const accessUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://webster.pillflow.com.au'}/patients/shared/${patient.shareToken}`;
 
       const emailHtml = generatePatientAccessGrantEmailHTML({
         patientName: `${patient.firstName} ${patient.lastName}`,
@@ -303,7 +303,7 @@ export const grantTokenAccess = mutation({
           })
         : undefined;
 
-      const accessUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://pillflow.app'}/patients/shared/${patient.shareToken}`;
+      const accessUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://webster.pillflow.com.au'}/patients/shared/${patient.shareToken}`;
 
       const emailHtml = generatePatientAccessGrantEmailHTML({
         patientName: `${patient.firstName} ${patient.lastName}`,
@@ -427,7 +427,7 @@ export const inviteUserAndGrantTokenAccess = mutation({
           })
         : undefined;
 
-      const invitationUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://pillflow.app'}/auth/signin?invitation=${accessGrantId}`;
+      const invitationUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://webster.pillflow.com.au'}/signin?invite=${accessGrantId}`;
 
       const emailHtml = generatePatientAccessGrantEmailHTML({
         patientName: `${patient.firstName} ${patient.lastName}`,
@@ -1794,6 +1794,7 @@ export const getPatientScripts = query({
 export const deletePatientScript = mutation({
   args: {
     scriptId: v.id("patientScripts"),
+    requestNotes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -1815,27 +1816,90 @@ export const deletePatientScript = mutation({
       throw new Error("Unauthorized: No access to this patient");
     }
 
-    // Soft delete the script
-    await ctx.db.patch(args.scriptId, {
-      isActive: false,
-    });
+    // Get patient to check organization ownership
+    const patient = await ctx.db.get(script.patientId);
+    if (!patient) throw new Error("Patient not found");
 
-    // Delete from storage
-    await ctx.storage.delete(script.fileUrl as any);
+    const isPatientOwner = userProfile.organizationId === patient.organizationId;
 
-    // Add to communication log
-    await ctx.db.insert("patientComments", {
-      patientId: script.patientId,
-      authorId: userProfile._id,
-      authorOrg: userProfile.organizationId!,
-      content: `Deleted script: ${script.originalFileName}`,
-      commentType: "system",
-      isPrivate: false,
-      isActive: true,
-      createdAt: Date.now(),
-    });
+    if (isPatientOwner) {
+      // Patient owner can delete directly
+      // Soft delete the script
+      await ctx.db.patch(args.scriptId, {
+        isActive: false,
+      });
 
-    return { success: true };
+      // Delete from storage
+      await ctx.storage.delete(script.fileUrl as any);
+
+      // Add to communication log
+      await ctx.db.insert("patientComments", {
+        patientId: script.patientId,
+        authorId: userProfile._id,
+        authorOrg: userProfile.organizationId!,
+        content: `Deleted script: ${script.originalFileName}`,
+        commentType: "system",
+        isPrivate: false,
+        isActive: true,
+        createdAt: Date.now(),
+      });
+
+      return { success: true, requestId: null };
+    } else {
+      // Non-patient owner must request approval
+      // Check if user is from a different organization (shared access)
+      const isSharedAccess = userProfile.organizationId !== patient.organizationId;
+      if (!isSharedAccess) {
+        throw new Error("Only users from other organizations can request script deletions");
+      }
+
+      // Cancel any existing pending requests for this script by this user
+      const existingRequests = await ctx.db
+        .query("medicationChangeRequests")
+        .withIndex("by_patient", (q) => q.eq("patientId", script.patientId))
+        .filter((q) => q.and(
+          q.eq(q.field("requestedBy"), userProfile._id),
+          q.eq(q.field("status"), "pending"),
+          q.eq(q.field("requestType"), "remove")
+        ))
+        .collect();
+
+      for (const existingRequest of existingRequests) {
+        await ctx.db.patch(existingRequest._id, { status: "canceled" });
+      }
+
+      // Create removal request for script
+      const requestId = await ctx.db.insert("medicationChangeRequests", {
+        patientId: script.patientId,
+        medicationId: undefined, // Not a medication, but a script
+        requestType: "remove",
+        requestedChanges: {}, // Empty for script removal
+        requestNotes: `Request to remove script: ${script.originalFileName}${args.requestNotes ? ` - ${args.requestNotes}` : ''}`,
+        requestedBy: userProfile._id,
+        requestedByOrg: userProfile.organizationId!,
+        requestedAt: Date.now(),
+        status: "pending",
+        originalState: JSON.stringify({
+          originalFileName: script.originalFileName,
+          description: script.description,
+          fileType: script.fileType,
+        }),
+      });
+
+      // Add to communication log
+      await ctx.db.insert("patientComments", {
+        patientId: script.patientId,
+        authorId: userProfile._id,
+        authorOrg: userProfile.organizationId!,
+        content: `Requested deletion of script: ${script.originalFileName}${args.requestNotes ? ` - ${args.requestNotes}` : ''}`,
+        commentType: "system",
+        isPrivate: false,
+        isActive: true,
+        createdAt: Date.now(),
+      });
+
+      return { success: true, requestId };
+    }
   },
 });
 

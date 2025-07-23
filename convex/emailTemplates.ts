@@ -525,15 +525,54 @@ export function generatePatientAccessGrantEmailHTML({
             </p>
           </div>
 
+          <div style="background-color: #FFF3CD; border: 1px solid #FFEAA7; border-radius: 8px; padding: 20px; margin-bottom: 40px; text-align: left;">
+            <h3 style="margin-top: 0; color: #856404; font-size: 16px; font-weight: 600;">
+              🔐 Authentication Required:
+            </h3>
+            <p style="margin: 10px 0; font-size: 14px; color: #000000; font-weight: 500;">
+              • You must sign in or create an account to access this patient's information
+            </p>
+            <p style="margin: 10px 0; font-size: 14px; color: #000000; font-weight: 500;">
+              • Visit <strong>webster.pillflow.com.au</strong> to sign in or sign up
+            </p>
+            <p style="margin: 10px 0; font-size: 14px; color: #000000; font-weight: 500;">
+              • After signing in, use the access token provided below
+            </p>
+          </div>
+
+          <div style="background-color: #F9F9F9; border-radius: 12px; padding: 40px; margin-bottom: 40px; text-align: left;">
+            <h2 style="font-size: 20px; font-weight: 600; color: #000000; margin: 0 0 24px 0;">
+              Access Instructions
+            </h2>
+            
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <div style="width: 24px; height: 24px; background-color: #000000; color: #ffffff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; flex-shrink: 0;">1</div>
+                <div>
+                  <p style="margin: 0; font-size: 16px; font-weight: 600; color: #000000;">Sign in to PillFlow</p>
+                  <p style="margin: 4px 0 0 0; font-size: 16px; color: #000000; font-weight: 500;">Go to webster.pillflow.com.au and sign in or create your account</p>
+                </div>
+              </div>
+              
+              <div style="display: flex; align-items: flex-start; gap: 12px;">
+                <div style="width: 24px; height: 24px; background-color: #000000; color: #ffffff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 600; flex-shrink: 0;">2</div>
+                <div>
+                  <p style="margin: 0; font-size: 16px; font-weight: 600; color: #000000;">Use your access token</p>
+                  <p style="margin: 4px 0 0 0; font-size: 16px; color: #000000; font-weight: 500;">After signing in, use the access link provided below</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div style="margin-bottom: 40px;">
             <a href="${accessUrl}" style="display: inline-block; background-color: #000000; color: #ffffff; font-size: 16px; font-weight: 700; padding: 16px 32px; border-radius: 8px; text-decoration: none; letter-spacing: -0.5px; min-width: 154px;">
-              View Patient
+              Access Patient After Sign In
             </a>
           </div>
 
           <div style="margin-bottom: 40px;">
             <p style="font-size: 16px; color: #000000; margin: 0 0 16px 0; font-weight: 500;">
-              Or copy and paste this link:
+              Access URL (use after signing in):
             </p>
             <div style="background-color: #F5F5F5; padding: 16px; border-radius: 8px; font-size: 14px; color: #000000; word-break: break-all; font-family: monospace; text-align: left;">
               <a href="${accessUrl}" style="color: #000000; text-decoration: none;">

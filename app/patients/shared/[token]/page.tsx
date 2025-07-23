@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
+import { useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,21 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, User, Calendar, Mail, Phone, MapPin, Package, Share2, Building2, Info, Pill, MessageSquare, PackageCheck } from "lucide-react";
+import { 
+  ArrowLeft, 
+  User, 
+  Calendar, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Package, 
+  Share2, 
+  Building2, 
+  Info, 
+  Pill, 
+  MessageSquare, 
+  PackageCheck
+} from "lucide-react";
 import Link from "next/link";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -33,26 +48,26 @@ import { PatientWebsterPacks } from "@/components/ui/patient-webster-packs";
 export default function SharedPatientPage() {
   const params = useParams();
   const shareToken = decodeURIComponent(params.token as string);
+  const { isAuthenticated, isLoading } = useConvexAuth();
   
   const patient = useQuery(api.patients.getPatientByShareToken, { shareToken });
   const logAccess = useMutation(api.patients.logShareTokenAccess);
-  
   const [accessLogged, setAccessLogged] = useState(false);
 
   // Log the access when patient data is loaded
   useEffect(() => {
-    if (patient && !accessLogged) {
-             logAccess({
-         patientId: patient._id,
-         shareToken: shareToken,
-         accessType: patient.accessType as "same_organization" | "cross_organization",
-       }).then(() => {
+    if (patient && !accessLogged && isAuthenticated) {
+      logAccess({
+        patientId: patient._id,
+        shareToken: shareToken,
+        accessType: patient.accessType as "same_organization" | "cross_organization",
+      }).then(() => {
         setAccessLogged(true);
       }).catch((error) => {
         console.error("Failed to log access:", error);
       });
     }
-  }, [patient, accessLogged, logAccess, shareToken]);
+  }, [patient, accessLogged, logAccess, shareToken, isAuthenticated]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -74,6 +89,47 @@ export default function SharedPatientPage() {
     }
     return age;
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-lg text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to signin if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-center">Authentication Required</CardTitle>
+              <CardDescription className="text-center">
+                You must be signed in to access shared patient information.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center space-y-4">
+                <p className="text-sm text-gray-600">
+                  This patient data is protected and requires authentication to view.
+                </p>
+                <Link href="/signin">
+                  <Button className="w-full">
+                    Sign In to Continue
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (patient === undefined) {
     return (
@@ -368,4 +424,4 @@ export default function SharedPatientPage() {
       </SidebarInset>
     </SidebarProvider>
   );
-} 
+}

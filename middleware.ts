@@ -6,12 +6,17 @@ import {
 
 const isSignInPage = createRouteMatcher(["/signin"]);
 const isProtectedRoute = createRouteMatcher(["/", "/server"]);
+const isSharedPatientRoute = createRouteMatcher(["/patients/shared(.*)"]);
 
 export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
+  // Require authentication for all routes including shared patient pages
   if (isSignInPage(request) && (await convexAuth.isAuthenticated())) {
     return nextjsMiddlewareRedirect(request, "/");
   }
   if (isProtectedRoute(request) && !(await convexAuth.isAuthenticated())) {
+    return nextjsMiddlewareRedirect(request, "/signin");
+  }
+  if (isSharedPatientRoute(request) && !(await convexAuth.isAuthenticated())) {
     return nextjsMiddlewareRedirect(request, "/signin");
   }
 });
