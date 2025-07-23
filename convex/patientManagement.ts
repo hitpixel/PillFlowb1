@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { generatePatientAccessGrantEmailHTML } from "./emailTemplates";
+import { generatePatientAccessGrantEmailHTML, generatePatientShareCodeEmailHTML } from "./emailTemplates";
 import { resend } from "./emails";
 
 // TOKEN ACCESS MANAGEMENT
@@ -413,29 +413,15 @@ export const inviteUserAndGrantTokenAccess = mutation({
       invitedLastName: args.lastName,
     });
 
-    // Send invitation email
+    // Send invitation email with share code only
     const grantedByOrg = await ctx.db.get(userProfile.organizationId!);
 
     if (grantedByOrg) {
-      const expiresAtFormatted = expiresAt
-        ? new Date(expiresAt).toLocaleDateString('en-AU', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          })
-        : undefined;
-
-      const invitationUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'https://webster.pillflow.com.au'}/signin?invite=${accessGrantId}`;
-
-      const emailHtml = generatePatientAccessGrantEmailHTML({
+      const emailHtml = generatePatientShareCodeEmailHTML({
         patientName: `${patient.firstName} ${patient.lastName}`,
         grantedByName: `${userProfile.firstName} ${userProfile.lastName}`,
         grantedByOrganization: grantedByOrg.name,
-        permissions: args.permissions,
-        expiresAt: expiresAtFormatted,
-        accessUrl: invitationUrl,
+        shareCode: patient.shareToken,
       });
 
       try {
@@ -443,17 +429,18 @@ export const inviteUserAndGrantTokenAccess = mutation({
           ctx,
           "PillFlow Access <noreply@pillflow.com.au>",
           args.email,
-          `Invitation to Access ${patient.firstName} ${patient.lastName}'s Medication Information`,
+          `Patient Access Code: ${patient.firstName} ${patient.lastName}`,
           emailHtml,
-          `Invitation to Access ${patient.firstName} ${patient.lastName}'s Medication Information
+          `Patient Access Code: ${patient.firstName} ${patient.lastName}
 
-You have been invited to access ${patient.firstName} ${patient.lastName}'s medication information by ${userProfile.firstName} ${userProfile.lastName} from ${grantedByOrg.name}.
+${userProfile.firstName} ${userProfile.lastName} from ${grantedByOrg.name} has shared patient ${patient.firstName} ${patient.lastName}'s medication information with you.
 
-To access this information, please click the link below to create your account:
+Your access code is: ${patient.shareToken}
 
-Invitation URL: ${invitationUrl}
-
-Once you create your account, you'll automatically be granted access to view ${patient.firstName}'s medication details and request changes as needed.
+To access this information:
+1. Visit webster.pillflow.com.au
+2. Sign in or create your account
+3. Use the access code above to view patient information
 
 Best regards,
 The PillFlow Team`

@@ -595,3 +595,92 @@ export function generatePatientAccessGrantEmailHTML({
     </div>
   `;
 }
+
+// NEW: Generate email with only share code (no organization invite)
+export function generatePatientShareCodeEmailHTML({
+  patientName,
+  grantedByName,
+  grantedByOrganization,
+  shareCode,
+}: {
+  patientName: string;
+  grantedByName: string;
+  grantedByOrganization: string;
+  shareCode: string;
+}): string {
+  return `
+    <div style="font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #000000; background-color: #F9F9F9; margin: 0; padding: 0;">
+      <div style="max-width: 480px; margin: 0 auto; padding: 70px 24px;">
+        <div style="background-color: #FFFFFF; border: 1px solid #CECECE; border-radius: 20px; padding: 50px 40px 40px 40px; text-align: center;">
+          <div style="font-family: Inter, sans-serif; font-size: 24px; font-weight: 700; color: #000000; margin-bottom: 40px; letter-spacing: -0.02em;">
+            PillFlow
+          </div>
+
+          <h1 style="font-size: 32px; font-weight: 600; color: #000000; margin: 0 0 17px 0; letter-spacing: -1.2px; line-height: 1.2;">
+            Patient Access Code
+          </h1>
+
+          <p style="font-size: 16px; color: #000000; margin: 0 0 40px 0; line-height: 1.5; font-weight: 500;">
+            ${grantedByName} from ${grantedByOrganization} has shared patient ${patientName}'s medication information with you.
+          </p>
+
+          <div style="background-color: #F9F9F9; border-radius: 12px; padding: 40px; margin-bottom: 40px; text-align: left;">
+            <h2 style="font-size: 20px; font-weight: 600; color: #000000; margin: 0 0 24px 0;">
+              Your Access Code
+            </h2>
+            
+            <div style="background-color: #000000; color: #ffffff; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 20px;">
+              <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 0; font-family: 'Courier New', monospace;">
+                ${shareCode}
+              </p>
+            </div>
+            
+            <p style="font-size: 16px; color: #000000; font-weight: 500; margin: 0;">
+              Use this code to access the patient's information after signing in to PillFlow.
+            </p>
+          </div>
+
+          <div style="background-color: #FFF3CD; border: 1px solid #FFEAA7; border-radius: 8px; padding: 20px; margin-bottom: 40px; text-align: left;">
+            <h3 style="margin-top: 0; color: #856404; font-size: 16px; font-weight: 600;">
+              🔐 How to Access:
+            </h3>
+            <p style="margin: 10px 0; font-size: 14px; color: #000000; font-weight: 500;">
+              1. Visit <strong>webster.pillflow.com.au</strong>
+            </p>
+            <p style="margin: 10px 0; font-size: 14px; color: #000000; font-weight: 500;">
+              2. Sign in or create your account
+            </p>
+            <p style="margin: 10px 0; font-size: 14px; color: #000000; font-weight: 500;">
+              3. Use the access code above to view patient information
+            </p>
+          </div>
+
+          <div style="background-color: #FFF3CD; border: 1px solid #FFEAA7; border-radius: 8px; padding: 20px; margin-bottom: 40px; text-align: left;">
+            <h3 style="margin-top: 0; color: #856404; font-size: 16px; font-weight: 600;">
+              🔒 Important Security Notice:
+            </h3>
+            <p style="margin: 10px 0; font-size: 14px; color: #000000; font-weight: 500;">
+              • This access is for healthcare collaboration purposes only
+            </p>
+            <p style="margin: 10px 0; font-size: 14px; color: #000000; font-weight: 500;">
+              • All actions are logged for audit purposes
+            </p>
+            <p style="margin: 10px 0; font-size: 14px; color: #000000; font-weight: 500;">
+              • You can request medication changes, but they require approval
+            </p>
+          </div>
+
+          <div style="border-top: 1px solid #E5E5E5; padding-top: 30px; margin-top: 40px;">
+            <p style="font-size: 16px; color: #000000; margin: 0; line-height: 1.5; font-weight: 500;">
+              Best regards,<br />
+              The PillFlow Team
+            </p>
+            <p style="font-size: 12px; color: #666666; margin: 16px 0 0 0; font-weight: 500;">
+              This email was sent from PillFlow
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
