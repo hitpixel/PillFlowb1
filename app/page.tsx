@@ -38,10 +38,8 @@ export default function HomePage() {
   const patientStats = useQuery(api.patients.getPatientStats);
   const medicationStats = useQuery(api.patients.getMedicationStats);
   
-  // Only query Webster stats for pharmacy organizations
-  const websterStats = useQuery(
-    organization?.type === "pharmacy" ? api.websterPacks.getWebsterCheckStats : "skip"
-  );
+  // Query Webster stats - returns null for non-pharmacy organizations
+  const websterStats = useQuery(api.websterPacks.getWebsterCheckStats);
   
   const router = useRouter();
   const [featuresOpen, setFeaturesOpen] = useState(false);
@@ -92,6 +90,10 @@ export default function HomePage() {
   }
 
   if (!isAuthenticated || setupStatus.needsSetup) {
+    return null; // Will redirect in useEffect
+  }
+
+  if (!setupStatus.hasOrganization) {
     return null; // Will redirect in useEffect
   }
 
@@ -355,127 +357,7 @@ export default function HomePage() {
               </CardContent>
             </Card>
             
-            // In the dashboard cards section, update the Webster pack checks card:
-            <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-800">
-            {organization?.type === "pharmacy" ? "Webster Pack Checks" : "Quality Checks"}
-            </CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-            <div className="text-2xl font-bold text-green-900">
-            {organization?.type === "pharmacy" ? (websterStats?.totalChecks ?? 0) : 0}
-            </div>
-            <p className="text-xs text-green-600">
-            {organization?.type === "pharmacy"
-            ? (websterStats?.todayChecks ? `${websterStats.todayChecks} today` : "No checks today")
-            : "Feature available for pharmacies"
-            }
-            </p>
-            </CardContent>
-            </Card>
-            </div>
-            </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
-      )}
-
-      {/* Quick Stats */}
-      <div className="grid auto-rows-min gap-6 md:grid-cols-4">
-        <Card className="border hover:shadow-lg transition-all duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-base font-semibold" style={{color: '#000000'}}>Total Patients</CardTitle>
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <Users className="h-5 w-5 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-3xl font-bold" style={{color: '#000000'}}>
-              {patientStats?.totalPatients ?? 0}
-            </div>
-            <div className="h-[60px] w-full relative overflow-hidden">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={patientGrowthData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                  <Area 
-                    type="monotone" 
-                    dataKey="cumulativePatients" 
-                    stroke="#3B82F6" 
-                    fill="#3B82F6" 
-                    fillOpacity={0.2}
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="text-sm" style={{color: '#000000'}}>
-              {patientStats?.patientsThisMonth ? `+${patientStats.patientsThisMonth} this month` : "No new patients this month"}
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card className="border hover:shadow-lg transition-all duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-base font-semibold" style={{color: '#000000'}}>Active Medications</CardTitle>
-            <div className="p-2 bg-green-50 rounded-lg">
-              <Activity className="h-5 w-5 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-3xl font-bold" style={{color: '#000000'}}>
-              {medicationStats?.totalMedications ?? 0}
-            </div>
-            <div className="h-[60px] w-full relative overflow-hidden">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={medicationData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                  <Area 
-                    type="monotone" 
-                    dataKey="cumulativeMedications" 
-                    stroke="#10B981" 
-                    fill="#10B981" 
-                    fillOpacity={0.2}
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="text-sm" style={{color: '#000000'}}>
-              {medicationStats?.medicationsThisMonth ? `+${medicationStats.medicationsThisMonth} this month` : "No new medications this month"}
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card className="border hover:shadow-lg transition-all duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <CardTitle className="text-base font-semibold" style={{color: '#000000'}}>Compliance Rate</CardTitle>
-            <div className="p-2 bg-purple-50 rounded-lg">
-              <TrendingUp className="h-5 w-5 text-purple-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-3xl font-bold" style={{color: '#000000'}}>
-              {(patientStats?.totalPatients || 0) > 0 ? "92%" : "0%"}
-            </div>
-            <div className="h-[60px] w-full relative overflow-hidden">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={complianceData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                  <Area
-                    type="monotone"
-                    dataKey="rate"
-                    stroke="#8B5CF6"
-                    fill="#8B5CF6"
-                    fillOpacity={0.2}
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="text-sm" style={{color: '#000000'}}>
-              {(patientStats?.totalPatients || 0) > 0 ? "Excellent compliance rate" : "No patients yet"}
-            </p>
-          </CardContent>
-        </Card>
+            
         
         <Card className="border hover:shadow-lg transition-all duration-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -626,5 +508,5 @@ export default function HomePage() {
     </div>
   </SidebarInset>
 </SidebarProvider>
-)
+  );
 }

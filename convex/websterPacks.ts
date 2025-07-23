@@ -115,7 +115,7 @@ export const getPatientWebsterChecks = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return []; // Return empty array instead of throwing
     }
 
     // Get user profile to find organization
@@ -125,7 +125,7 @@ export const getPatientWebsterChecks = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization");
+      return []; // Return empty array instead of throwing
     }
 
     // Check if user has access to this patient
@@ -168,7 +168,7 @@ export const getRecentWebsterChecks = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return []; // Return empty array instead of throwing
     }
 
     // Get user profile to find organization
@@ -178,13 +178,13 @@ export const getRecentWebsterChecks = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization");
+      return []; // Return empty array instead of throwing
     }
 
     // Get organization to verify it's a pharmacy
     const organization = await ctx.db.get(userProfile.organizationId);
     if (!organization || organization.type !== "pharmacy") {
-      throw new Error("Webster pack checking is only available to pharmacy organizations");
+      return []; // Return empty array instead of throwing
     }
 
     // Get recent checks from the same organization
@@ -223,7 +223,7 @@ export const searchPatientsForWebsterCheck = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return []; // Return empty array instead of throwing
     }
 
     // Get user profile to find organization
@@ -233,13 +233,13 @@ export const searchPatientsForWebsterCheck = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization");
+      return []; // Return empty array instead of throwing
     }
 
     // Get organization to verify it's a pharmacy
     const organization = await ctx.db.get(userProfile.organizationId);
     if (!organization || organization.type !== "pharmacy") {
-      throw new Error("Webster pack checking is only available to pharmacy organizations");
+      return []; // Return empty array instead of throwing
     }
 
     const searchTerm = args.searchTerm.toLowerCase();
@@ -304,7 +304,7 @@ export const getPatientMedicationsByTime = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return null; // Return null instead of throwing
     }
 
     // Get user profile to find organization
@@ -314,13 +314,13 @@ export const getPatientMedicationsByTime = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization");
+      return null; // Return null instead of throwing
     }
 
     // Get organization to verify it's a pharmacy
     const organization = await ctx.db.get(userProfile.organizationId);
     if (!organization || organization.type !== "pharmacy") {
-      throw new Error("Webster pack checking is only available to pharmacy organizations");
+      return null; // Return null instead of throwing
     }
 
     // Check if user has access to this patient
@@ -434,7 +434,8 @@ export const getWebsterCheckStats = query({
     // Get organization to verify it's a pharmacy
     const organization = await ctx.db.get(userProfile.organizationId);
     if (!organization || organization.type !== "pharmacy") {
-      throw new Error("Webster pack checking is only available to pharmacy organizations");
+      // Return null for non-pharmacy organizations instead of throwing
+      return null;
     }
 
     // Get all checks from the organization
@@ -630,7 +631,7 @@ export const getWebsterScanOutStats = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return null; // Return null instead of throwing
     }
 
     // Get user profile to find organization
@@ -640,13 +641,13 @@ export const getWebsterScanOutStats = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization");
+      return null; // Return null instead of throwing
     }
 
     // Get organization to verify it's a pharmacy
     const organization = await ctx.db.get(userProfile.organizationId);
     if (!organization || organization.type !== "pharmacy") {
-      throw new Error("Webster pack scan out is only available to pharmacy organizations");
+      return null; // Return null instead of throwing
     }
 
     // Get all scan outs from the organization
@@ -694,7 +695,7 @@ export const getPatientWebsterScanOuts = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return []; // Return empty array instead of throwing
     }
 
     // Get user profile to find organization
@@ -704,13 +705,13 @@ export const getPatientWebsterScanOuts = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization");
+      return []; // Return empty array instead of throwing
     }
 
     // Check if user has access to this patient
     const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
     if (!hasAccess) {
-      throw new Error("Access denied: You don't have permission to view scan outs for this patient");
+      return []; // Return empty array instead of throwing
     }
 
     // Get scan outs for the patient
@@ -747,7 +748,7 @@ export const getRecentWebsterScanOuts = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return []; // Return empty array instead of throwing
     }
 
     // Get user profile to find organization
@@ -757,13 +758,13 @@ export const getRecentWebsterScanOuts = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization");
+      return []; // Return empty array instead of throwing
     }
 
     // Get organization to verify it's a pharmacy
     const organization = await ctx.db.get(userProfile.organizationId);
     if (!organization || organization.type !== "pharmacy") {
-      throw new Error("Webster pack scan out is only available to pharmacy organizations");
+      return []; // Return empty array instead of throwing
     }
 
     // Get recent scan outs from the same organization
@@ -800,7 +801,11 @@ export const getWebsterPackCheckStatus = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return {
+        isChecked: false,
+        canScanOut: false,
+        message: "User not authenticated",
+      };
     }
 
     // Get user profile to find organization
@@ -810,13 +815,21 @@ export const getWebsterPackCheckStatus = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization");
+      return {
+        isChecked: false,
+        canScanOut: false,
+        message: "User must be part of an organization",
+      };
     }
 
     // Get organization to verify it's a pharmacy
     const organization = await ctx.db.get(userProfile.organizationId);
     if (!organization || organization.type !== "pharmacy") {
-      throw new Error("Webster pack checking is only available to pharmacy organizations");
+      return {
+        isChecked: false,
+        canScanOut: false,
+        message: "Webster pack checking is only available to pharmacy organizations",
+      };
     }
 
     // Find the most recent check for this Webster pack

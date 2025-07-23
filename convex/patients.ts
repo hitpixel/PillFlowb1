@@ -84,7 +84,7 @@ export const getPatients = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return []; // Return empty array instead of throwing for unauthenticated users
     }
 
     // Get user profile to find organization
@@ -94,7 +94,7 @@ export const getPatients = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization to view patients");
+      return []; // Return empty array instead of throwing
     }
 
     // Get patients from user's organization
@@ -398,7 +398,7 @@ export const searchPatients = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return []; // Return empty array instead of throwing
     }
 
     // Get user profile to find organization
@@ -408,7 +408,7 @@ export const searchPatients = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization to search patients");
+      return []; // Return empty array instead of throwing
     }
 
     const searchTerm = args.searchTerm.toLowerCase();
@@ -489,7 +489,7 @@ export const getPatientStats = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return null; // Return null for unauthenticated users
     }
 
     // Get user profile to find organization
@@ -499,7 +499,7 @@ export const getPatientStats = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization to view statistics");
+      return null; // Return null for users without organization
     }
 
     const allPatients = await ctx.db
@@ -558,7 +558,7 @@ export const getMedicationStats = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      throw new Error("User not authenticated");
+      return null; // Return null for unauthenticated users
     }
 
     // Get user profile to find organization
@@ -568,7 +568,7 @@ export const getMedicationStats = query({
       .first();
 
     if (!userProfile || !userProfile.organizationId) {
-      throw new Error("User must be part of an organization to view statistics");
+      return null; // Return null for users without organization
     }
 
     // Get all active medications in the organization

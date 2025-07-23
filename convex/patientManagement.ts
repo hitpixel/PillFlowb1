@@ -499,21 +499,21 @@ export const getPatientAccessGrants = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Authentication required");
+    if (!userId) return []; // Return empty array instead of throwing
 
     const userProfile = await ctx.db
       .query("userProfiles")
       .withIndex("by_user_id", (q) => q.eq("userId", userId))
       .first();
 
-    if (!userProfile) throw new Error("User profile not found");
+    if (!userProfile) return []; // Return empty array instead of throwing
 
     // Get patient and verify access
     const patient = await ctx.db.get(args.patientId);
-    if (!patient) throw new Error("Patient not found");
+    if (!patient) return []; // Return empty array instead of throwing
 
     if (patient.organizationId !== userProfile.organizationId) {
-      throw new Error("Unauthorized: Patient not in your organization");
+      return []; // Return empty array instead of throwing
     }
 
     const accessGrants = await ctx.db
@@ -791,19 +791,19 @@ export const getPatientMedications = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Authentication required");
+    if (!userId) return []; // Return empty array instead of throwing
 
     const userProfile = await ctx.db
       .query("userProfiles")
       .withIndex("by_user_id", (q) => q.eq("userId", userId))
       .first();
 
-    if (!userProfile) throw new Error("User profile not found");
+    if (!userProfile) return []; // Return empty array instead of throwing
 
     // Check if user has access to this patient
     const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
     if (!hasAccess) {
-      throw new Error("Unauthorized: No access to this patient");
+      return []; // Return empty array instead of throwing
     }
 
     const medications = await ctx.db
@@ -996,19 +996,19 @@ export const getPatientComments = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Authentication required");
+    if (!userId) return []; // Return empty array instead of throwing
 
     const userProfile = await ctx.db
       .query("userProfiles")
       .withIndex("by_user_id", (q) => q.eq("userId", userId))
       .first();
 
-    if (!userProfile) throw new Error("User profile not found");
+    if (!userProfile) return []; // Return empty array instead of throwing
 
     // Check if user has access to this patient
     const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
     if (!hasAccess) {
-      throw new Error("Unauthorized: No access to this patient");
+      return []; // Return empty array instead of throwing
     }
 
     const comments = await ctx.db
@@ -1056,19 +1056,19 @@ export const getPatientMedicationLogs = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Authentication required");
+    if (!userId) return []; // Return empty array instead of throwing
 
     const userProfile = await ctx.db
       .query("userProfiles")
       .withIndex("by_user_id", (q) => q.eq("userId", userId))
       .first();
 
-    if (!userProfile) throw new Error("User profile not found");
+    if (!userProfile) return []; // Return empty array instead of throwing
 
     // Check if user has access to this patient
     const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
     if (!hasAccess) {
-      throw new Error("Unauthorized: No access to this patient");
+      return []; // Return empty array instead of throwing
     }
 
     const logs = await ctx.db
@@ -1727,19 +1727,19 @@ export const getPatientScripts = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Authentication required");
+    if (!userId) return []; // Return empty array instead of throwing
 
     const userProfile = await ctx.db
       .query("userProfiles")
       .withIndex("by_user_id", (q) => q.eq("userId", userId))
       .first();
 
-    if (!userProfile) throw new Error("User profile not found");
+    if (!userProfile) return []; // Return empty array instead of throwing
 
     // Check if user has access to this patient
     const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
     if (!hasAccess) {
-      throw new Error("Unauthorized: No access to this patient");
+      return []; // Return empty array instead of throwing
     }
 
     const scripts = await ctx.db
@@ -1960,19 +1960,19 @@ export const getPatientEtokens = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Authentication required");
+    if (!userId) return []; // Return empty array instead of throwing
 
     const userProfile = await ctx.db
       .query("userProfiles")
       .withIndex("by_user_id", (q) => q.eq("userId", userId))
       .first();
 
-    if (!userProfile) throw new Error("User profile not found");
+    if (!userProfile) return []; // Return empty array instead of throwing
 
     // Check if user has access to this patient
     const hasAccess = await checkPatientAccess(ctx, args.patientId, userProfile._id);
     if (!hasAccess) {
-      throw new Error("Unauthorized: No access to this patient");
+      return []; // Return empty array instead of throwing
     }
 
     const etokens = await ctx.db
