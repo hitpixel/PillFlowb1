@@ -37,7 +37,12 @@ export default function HomePage() {
   const organization = useQuery(api.users.getOrganization);
   const patientStats = useQuery(api.patients.getPatientStats);
   const medicationStats = useQuery(api.patients.getMedicationStats);
-  const websterStats = useQuery(api.websterPacks.getWebsterCheckStats);
+  
+  // Only query Webster stats for pharmacy organizations
+  const websterStats = useQuery(
+    organization?.type === "pharmacy" ? api.websterPacks.getWebsterCheckStats : "skip"
+  );
+  
   const router = useRouter();
   const [featuresOpen, setFeaturesOpen] = useState(false);
 
@@ -350,154 +355,276 @@ export default function HomePage() {
               </CardContent>
             </Card>
             
-            <Card className="border hover:shadow-lg transition-all duration-200">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                <CardTitle className="text-base font-semibold" style={{color: '#000000'}}>
-                  {organization?.type === "pharmacy" ? "Pack Checks" : "Alerts"}
-                </CardTitle>
-                <div className="p-2 bg-red-50 rounded-lg">
-                  {organization?.type === "pharmacy" ? (
-                    <Shield className="h-5 w-5 text-red-600" />
-                  ) : (
-                    <AlertTriangle className="h-5 w-5 text-red-600" />
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-3xl font-bold" style={{color: '#000000'}}>
-                  {organization?.type === "pharmacy" ? (websterStats?.totalChecks ?? 0) : 0}
-                </div>
-                <div className="h-[60px] w-full relative overflow-hidden">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={alertData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                      <Area 
-                        type="monotone" 
-                        dataKey="alerts" 
-                        stroke="#EF4444" 
-                        fill="#EF4444" 
-                        fillOpacity={0.2}
-                        strokeWidth={2}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-                <p className="text-sm" style={{color: '#000000'}}>
-                  {organization?.type === "pharmacy" 
-                    ? (websterStats?.todayChecks ? `${websterStats.todayChecks} today` : "No checks today")
-                    : "No active alerts"
-                  }
-                </p>
-              </CardContent>
+            // In the dashboard cards section, update the Webster pack checks card:
+            <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-green-800">
+            {organization?.type === "pharmacy" ? "Webster Pack Checks" : "Quality Checks"}
+            </CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+            <div className="text-2xl font-bold text-green-900">
+            {organization?.type === "pharmacy" ? (websterStats?.totalChecks ?? 0) : 0}
+            </div>
+            <p className="text-xs text-green-600">
+            {organization?.type === "pharmacy"
+            ? (websterStats?.todayChecks ? `${websterStats.todayChecks} today` : "No checks today")
+            : "Feature available for pharmacies"
+            }
+            </p>
+            </CardContent>
             </Card>
-          </div>
+            </div>
+            </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      )}
 
-          {/* Main Content */}
-          <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
-            {/* Quick Actions */}
-            <Card className="border">
-              <CardHeader>
-                <CardTitle style={{color: '#000000'}}>Quick Actions</CardTitle>
-                <CardDescription style={{color: '#000000'}}>
-                  Common tasks to get you started
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {organization?.type === "pharmacy" && (
-                  <Button variant="outline" className="w-full justify-start h-12 text-left">
-                    <Plus className="mr-2 h-5 w-5" />
-                    <span style={{color: '#000000'}}>Add New Patient</span>
-                  </Button>
-                )}
-                {organization?.type === "pharmacy" && (
-                  <Button variant="outline" className="w-full justify-start h-12 text-left">
-                    <Shield className="mr-2 h-5 w-5" />
-                    <span style={{color: '#000000'}}>Check Webster Pack</span>
-                  </Button>
-                )}
-                <Button variant="outline" className="w-full justify-start h-12 text-left">
-                  <Activity className="mr-2 h-5 w-5" />
-                  <span style={{color: '#000000'}}>Record Medication</span>
-                </Button>
-                <Button variant="outline" className="w-full justify-start h-12 text-left">
-                  <TrendingUp className="mr-2 h-5 w-5" />
-                  <span style={{color: '#000000'}}>View Reports</span>
-                </Button>
-              </CardContent>
-            </Card>
+      {/* Quick Stats */}
+      <div className="grid auto-rows-min gap-6 md:grid-cols-4">
+        <Card className="border hover:shadow-lg transition-all duration-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold" style={{color: '#000000'}}>Total Patients</CardTitle>
+            <div className="p-2 bg-blue-50 rounded-lg">
+              <Users className="h-5 w-5 text-blue-600" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-3xl font-bold" style={{color: '#000000'}}>
+              {patientStats?.totalPatients ?? 0}
+            </div>
+            <div className="h-[60px] w-full relative overflow-hidden">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={patientGrowthData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                  <Area 
+                    type="monotone" 
+                    dataKey="cumulativePatients" 
+                    stroke="#3B82F6" 
+                    fill="#3B82F6" 
+                    fillOpacity={0.2}
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-sm" style={{color: '#000000'}}>
+              {patientStats?.patientsThisMonth ? `+${patientStats.patientsThisMonth} this month` : "No new patients this month"}
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border hover:shadow-lg transition-all duration-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold" style={{color: '#000000'}}>Active Medications</CardTitle>
+            <div className="p-2 bg-green-50 rounded-lg">
+              <Activity className="h-5 w-5 text-green-600" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-3xl font-bold" style={{color: '#000000'}}>
+              {medicationStats?.totalMedications ?? 0}
+            </div>
+            <div className="h-[60px] w-full relative overflow-hidden">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={medicationData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                  <Area 
+                    type="monotone" 
+                    dataKey="cumulativeMedications" 
+                    stroke="#10B981" 
+                    fill="#10B981" 
+                    fillOpacity={0.2}
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-sm" style={{color: '#000000'}}>
+              {medicationStats?.medicationsThisMonth ? `+${medicationStats.medicationsThisMonth} this month` : "No new medications this month"}
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border hover:shadow-lg transition-all duration-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold" style={{color: '#000000'}}>Compliance Rate</CardTitle>
+            <div className="p-2 bg-purple-50 rounded-lg">
+              <TrendingUp className="h-5 w-5 text-purple-600" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-3xl font-bold" style={{color: '#000000'}}>
+              {(patientStats?.totalPatients || 0) > 0 ? "92%" : "0%"}
+            </div>
+            <div className="h-[60px] w-full relative overflow-hidden">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={complianceData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                  <Area
+                    type="monotone"
+                    dataKey="rate"
+                    stroke="#8B5CF6"
+                    fill="#8B5CF6"
+                    fillOpacity={0.2}
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-sm" style={{color: '#000000'}}>
+              {(patientStats?.totalPatients || 0) > 0 ? "Excellent compliance rate" : "No patients yet"}
+            </p>
+          </CardContent>
+        </Card>
+        
+        <Card className="border hover:shadow-lg transition-all duration-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-base font-semibold" style={{color: '#000000'}}>
+              {organization?.type === "pharmacy" ? "Pack Checks" : "Alerts"}
+            </CardTitle>
+            <div className="p-2 bg-red-50 rounded-lg">
+              {organization?.type === "pharmacy" ? (
+                <Shield className="h-5 w-5 text-red-600" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-3xl font-bold" style={{color: '#000000'}}>
+              {organization?.type === "pharmacy" ? (websterStats?.totalChecks ?? 0) : 0}
+            </div>
+            <div className="h-[60px] w-full relative overflow-hidden">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={alertData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                  <Area 
+                    type="monotone" 
+                    dataKey="alerts" 
+                    stroke="#EF4444" 
+                    fill="#EF4444" 
+                    fillOpacity={0.2}
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-sm" style={{color: '#000000'}}>
+              {organization?.type === "pharmacy" 
+                ? (websterStats?.todayChecks ? `${websterStats.todayChecks} today` : "No checks today")
+                : "No active alerts"
+              }
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
-            {/* Organization Status */}
-            {setupStatus.hasOrganization && (
-              <Card className="border">
-                <CardHeader>
-                  <CardTitle style={{color: '#000000'}}>Organisation Setup Complete</CardTitle>
-                  <CardDescription style={{color: '#000000'}}>
-                    Your organisation is ready and active
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm" style={{color: '#000000'}}>
-                    You&apos;ve successfully completed your organisation setup! You can now start managing 
-                    patients, medications, and team members through your PillFlow dashboard.
-                  </p>
-                  <div className="flex gap-3">
-                    <Button size="sm" className="h-10">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Get Started
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-10">
-                      <span style={{color: '#000000'}}>View Organisation</span>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+      {/* Main Content */}
+      <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-3">
+        {/* Quick Actions */}
+        <Card className="border">
+          <CardHeader>
+            <CardTitle style={{color: '#000000'}}>Quick Actions</CardTitle>
+            <CardDescription style={{color: '#000000'}}>
+              Common tasks to get you started
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {organization?.type === "pharmacy" && (
+              <Button variant="outline" className="w-full justify-start h-12 text-left">
+                <Plus className="mr-2 h-5 w-5" />
+                <span style={{color: '#000000'}}>Add New Patient</span>
+              </Button>
             )}
+            {organization?.type === "pharmacy" && (
+              <Button variant="outline" className="w-full justify-start h-12 text-left">
+                <Shield className="mr-2 h-5 w-5" />
+                <span style={{color: '#000000'}}>Check Webster Pack</span>
+              </Button>
+            )}
+            <Button variant="outline" className="w-full justify-start h-12 text-left">
+              <Activity className="mr-2 h-5 w-5" />
+              <span style={{color: '#000000'}}>Record Medication</span>
+            </Button>
+            <Button variant="outline" className="w-full justify-start h-12 text-left">
+              <TrendingUp className="mr-2 h-5 w-5" />
+              <span style={{color: '#000000'}}>View Reports</span>
+            </Button>
+          </CardContent>
+        </Card>
 
-            {/* Support Card with Aurora Background */}
-            <AuroraCard className="hover:shadow-lg transition-all duration-200">
-              <motion.div
-                initial={{ opacity: 0.0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{
-                  delay: 0.2,
-                  duration: 0.6,
-                  ease: "easeInOut",
-                }}
-                className="p-6 h-full flex flex-col"
-              >
-                <div className="space-y-2 flex-1 pb-8">
-                  <h3 className="text-lg font-semibold" style={{color: '#000000'}}>
-                    We&apos;re here to support you.
-                  </h3>
-                  <p className="text-sm text-muted-foreground" style={{color: '#000000'}}>
-                    Have a question, need technical assistance, or want to provide feedback? Our team is just a message away.
-                  </p>
-                </div>
-                <div className="space-y-3 flex-none">
-                  <Button variant="outline" className="w-full h-12 bg-white/80 backdrop-blur-sm hover:bg-white/90 font-semibold">
-                    <span style={{color: '#000000'}}>Contact Support</span>
-                  </Button>
-                  <Button variant="outline" className="w-full h-12 bg-white/80 backdrop-blur-sm hover:bg-white/90 font-semibold">
-                    <span style={{color: '#000000'}}>Book a Call</span>
-                  </Button>
-                </div>
-              </motion.div>
-            </AuroraCard>
-          </div>
-
-          {/* Bottom content area */}
-          <div className="bg-gray-50 min-h-[200px] flex-1 rounded-xl md:min-h-min p-8 border">
-            <div className="text-center">
-              <div className="mb-4">
-                <BarChart3 className="h-16 w-16 mx-auto text-primary" />
+        {/* Organization Status */}
+        {setupStatus.hasOrganization && (
+          <Card className="border">
+            <CardHeader>
+              <CardTitle style={{color: '#000000'}}>Organisation Setup Complete</CardTitle>
+              <CardDescription style={{color: '#000000'}}>
+                Your organisation is ready and active
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm" style={{color: '#000000'}}>
+                You&apos;ve successfully completed your organisation setup! You can now start managing 
+                patients, medications, and team members through your PillFlow dashboard.
+              </p>
+              <div className="flex gap-3">
+                <Button size="sm" className="h-10">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Get Started
+                </Button>
+                <Button variant="outline" size="sm" className="h-10">
+                  <span style={{color: '#000000'}}>View Organisation</span>
+                </Button>
               </div>
-              <h3 className="text-xl font-semibold mb-3" style={{color: '#000000'}}>Ready to begin?</h3>
-              <p className="text-base" style={{color: '#000000'}}>
-                Your dashboard is set up and ready. Start managing your healthcare data efficiently with PillFlow.
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Support Card with Aurora Background */}
+        <AuroraCard className="hover:shadow-lg transition-all duration-200">
+          <motion.div
+            initial={{ opacity: 0.0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{
+              delay: 0.2,
+              duration: 0.6,
+              ease: "easeInOut",
+            }}
+            className="p-6 h-full flex flex-col"
+          >
+            <div className="space-y-2 flex-1 pb-8">
+              <h3 className="text-lg font-semibold" style={{color: '#000000'}}>
+                We&apos;re here to support you.
+              </h3>
+              <p className="text-sm text-muted-foreground" style={{color: '#000000'}}>
+                Have a question, need technical assistance, or want to provide feedback? Our team is just a message away.
               </p>
             </div>
+            <div className="space-y-3 flex-none">
+              <Button variant="outline" className="w-full h-12 bg-white/80 backdrop-blur-sm hover:bg-white/90 font-semibold">
+                <span style={{color: '#000000'}}>Contact Support</span>
+              </Button>
+              <Button variant="outline" className="w-full h-12 bg-white/80 backdrop-blur-sm hover:bg-white/90 font-semibold">
+                <span style={{color: '#000000'}}>Book a Call</span>
+              </Button>
+            </div>
+          </motion.div>
+        </AuroraCard>
+      </div>
+
+      {/* Bottom content area */}
+      <div className="bg-gray-50 min-h-[200px] flex-1 rounded-xl md:min-h-min p-8 border">
+        <div className="text-center">
+          <div className="mb-4">
+            <BarChart3 className="h-16 w-16 mx-auto text-primary" />
           </div>
+          <h3 className="text-xl font-semibold mb-3" style={{color: '#000000'}}>Ready to begin?</h3>
+          <p className="text-base" style={{color: '#000000'}}>
+            Your dashboard is set up and ready. Start managing your healthcare data efficiently with PillFlow.
+          </p>
         </div>
-      </SidebarInset>
-    </SidebarProvider>
-  )
+      </div>
+    </div>
+  </SidebarInset>
+</SidebarProvider>
+)
 }
